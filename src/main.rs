@@ -1,33 +1,16 @@
 #![allow(dead_code)]
 
-extern crate glfw;
+use crate::gfx::Interactible;
+extern crate sdl2;
 
 pub mod arch;
-
-use glfw::{Action, Context, Key};
+pub mod gfx;
 
 fn main() {
-    let mut glfw = glfw::init(glfw::fail_on_errors).unwrap();
+    let mut screen = gfx::Screen::new(300, 300, 64, 32, String::from("Chip-8 Emulator"));
+    screen.init();
 
-    let (mut window, events) = glfw.create_window(300, 300, "Hello this is window", glfw::WindowMode::Windowed)
-        .expect("Failed to create GLFW window.");
-
-    window.set_key_polling(true);
-    window.make_current();
-
-    while !window.should_close() {
-        glfw.poll_events();
-        for (_, event) in glfw::flush_messages(&events) {
-            handle_window_event(&mut window, event);
-        }
+    while screen.set_keys() {
     }
-}
 
-fn handle_window_event(window: &mut glfw::Window, event: glfw::WindowEvent) {
-    match event {
-        glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
-            window.set_should_close(true)
-        }
-        _ => {}
-    }
 }
