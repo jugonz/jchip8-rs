@@ -1,7 +1,5 @@
 use crate::gfx;
 
-use std::num::Wrapping;
-
 struct Opcode {
     value:   u16,
     // Registers are usize because rust forces indexing to be as usize,
@@ -26,6 +24,13 @@ impl Opcode {
     }
 }
 
+impl std::fmt::Display for Opcode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Value: 0x{:x} Xreg: {} Yreg: {} Literal: {}",
+            self.value, self.xreg, self.yreg, self.literal)
+    }
+}
+
 impl Default for Opcode {
     fn default() -> Opcode {
         Opcode {
@@ -41,7 +46,7 @@ struct Chip8 {
     // Core structural components.
     opcode: Opcode, // reference?
     memory: [u8; 4096],
-    registers: [Wrapping<u8>; 16],
+    registers: [u8; 16],
     index_reg: u16,
     pc: u16,
     delay_timer: u8,
@@ -67,8 +72,20 @@ trait InstructionSet {
     fn call(&mut self);
     fn r#return(&mut self);
     fn jump(&mut self);
+
+    // Manipulating data registers
+    fn set_reg_to_literal(&mut self);
+    fn set_reg_to_reg(&mut self);
+
     fn add(&mut self);
+    fn add_with_carry(&mut self);
     fn or(&mut self);
+    fn and(&mut self);
+    fn xor(&mut self);
+    fn sub_x_from_y(&mut self);
+    fn sub_y_from_x(&mut self);
+    fn shift_right(&mut self);
+    fn shift_left(&mut self);
 }
 
 impl InstructionSet for Chip8 {
@@ -90,9 +107,28 @@ impl InstructionSet for Chip8 {
         self.update_pc_cycles = 0;
     }
 
-    fn add(&mut self) {
+    fn set_reg_to_literal(&mut self) {
         let literal = (self.opcode.value & 0xFF) as u8;
         self.registers[self.opcode.xreg] += literal;
+    }
+
+    fn set_reg_to_reg(&mut self) {
+        let literal = self.registers[self.opcode.yreg];
+        self.registers[self.opcode.xreg] = literal;
+    }
+
+    fn add(&mut self) {
+        let literal = (self.opcode.value & 0xFF) as u8;
+        self.registers[self.opcode.xreg] =
+            self.registers[self.opcode.xreg].wrapping_add(literal);
+    }
+
+    fn add_with_carry(&mut self) {
+        let (sum, overflowed) = self.registers[self.opcode.xreg].
+            overflowing_add(self.registers[self.opcode.yreg]);
+
+        self.registers[self.opcode.xreg] = sum;
+        self.registers[0xF] = overflowed as u8;
     }
 
     fn or(&mut self) {
@@ -100,6 +136,51 @@ impl InstructionSet for Chip8 {
         self.registers[opcode.xreg] =
             self.registers[opcode.xreg] | self.registers[opcode.yreg];
     }
+
+    fn and(&mut self) {
+        let opcode = &self.opcode;
+        self.registers[opcode.xreg] =
+            self.registers[opcode.xreg] & self.registers[opcode.yreg];
+    }
+
+    fn xor(&mut self) {
+        let opcode = &self.opcode;
+        self.registers[opcode.xreg] =
+            self.registers[opcode.xreg] ^ self.registers[opcode.yreg];
+    }
+
+    fn sub_x_from_y(&mut self) {
+        let (diff, underflowed) = self.registers[self.opcode.yreg].
+            overflowing_sub(self.registers[self.opcode.xreg]);
+
+        self.registers[self.opcode.xreg] = diff;
+        self.registers[0xF] = !underflowed as u8; // inverted, save 0 on underflow
+    }
+
+    fn sub_y_from_x(&mut self) {
+        let (diff, underflowed) = self.registers[self.opcode.xreg].
+            overflowing_sub(self.registers[self.opcode.yreg]);
+
+        self.registers[self.opcode.xreg] = diff;
+        self.registers[0xF] = !underflowed as u8; // inverted, save 0 on underflow
+    }
+
+    fn shift_right(&mut self) {
+        let val = self.registers[self.opcode.xreg];
+
+        // Set VF to least significant bit of Xreg before shifting.
+        self.registers[0xF] = val & 0x1;
+        self.registers[self.opcode.xreg] = val >> 1;
+    }
+
+    fn shift_left(&mut self) {
+        let val = self.registers[self.opcode.xreg];
+
+        // Set VF to most significant bit of Xreg before shifting.
+        self.registers[0xF] = (val >> 7) & 0x1;
+        self.registers[self.opcode.xreg] = val << 1;
+    }
+
 }
 
 #[cfg(test)]
@@ -114,21 +195,47 @@ mod tests {
         c8.decode_exeucte();
 
         // Test that value is now correct.
-        assert_eq!(c8.registers[2].0, 0x12);
+        assert_eq!(c8.registers[2], 0x12);
 
         // Test the max value in a different register.
         c8.opcode = Opcode::new(0x73FF);
         c8.decode_exeucte();
 
         // Test that value is now correct.
-        assert_eq!(c8.registers[3].0, 0xFF);
+        assert_eq!(c8.registers[3], 0xFF);
 
         // Now, add one, and test overflow.
         c8.opcode = Opcode::new(0x7301);
         c8.decode_exeucte();
 
         // Test that value is now correct.
-        assert_eq!(c8.registers[3].0, 0x00);
+        assert_eq!(c8.registers[3], 0x00);
+    }
+
+    #[test]
+    fn add_with_carry() {
+        let mut c8 = Chip8::new(true);
+
+        // Test adding the max value without overflow.
+        c8.opcode = Opcode::new(0x73FF); // Add FF to reg 3 (0).
+        c8.decode_exeucte();
+        c8.opcode = Opcode::new(0x8374); // Add reg 7 (0) to reg 3.
+        c8.decode_exeucte();
+
+        // Test that value is now correct.
+        assert_eq!(c8.registers[3], 0xFF);
+        assert_eq!(c8.registers[0xF], 0);
+
+        // Now, add one, and test overflow.
+        c8.opcode = Opcode::new(0x7401); // Add 1 to reg 4 (0).
+        c8.decode_exeucte();
+        c8.opcode = Opcode::new(0x8344); // Add reg 4 (1) to reg 3 (FF).
+        c8.decode_exeucte();
+
+        // Test that value is now correct.
+        assert_eq!(c8.registers[3], 0);
+        // Test that the overflow register is correctly set.
+        assert_eq!(c8.registers[0xF], 1);
     }
 
     #[test]
@@ -170,7 +277,7 @@ impl Chip8 {
         let mut c8 = Chip8 {
             opcode: Opcode::new(0), // will be replaced
             memory: [0; 4096],
-            registers: [Wrapping(0u8); 16], // this is an emulator, we use wrapping arithmetic
+            registers: [0; 16], // this is an emulator, we use wrapping arithmetic
             index_reg: 0,
             pc: 0x200, // Starting PC is static.
             delay_timer: 0,
@@ -225,23 +332,37 @@ impl Chip8 {
         self.update_pc_cycles = 2; // unless overridden
         let value = self.opcode.value;
 
+        if self.debug {
+            println!("Registers: {:?}", self.registers);
+            println!("Executing opcode: {}", self.opcode);
+        }
+
         match value >> 12 {
             0x0 => {
                 match value & 0xFF {
                     0xEE => self.r#return(),
-                    _ => (),
+                    _ => panic!("Unimplemented opcode: {}", self.opcode),
                 }
             },
             0x1 => self.jump(),
             0x2 => self.call(),
+            0x6 => self.set_reg_to_literal(),
             0x7 => self.add(),
             0x8 => {
                 match value & 0xF {
+                    0x0 => self.set_reg_to_reg(),
                     0x1 => self.or(),
-                    _ => (),
+                    0x2 => self.and(),
+                    0x3 => self.xor(),
+                    0x4 => self.add_with_carry(),
+                    0x5 => self.sub_y_from_x(),
+                    0x6 => self.shift_right(),
+                    0x7 => self.sub_x_from_y(),
+                    0xE => self.shift_left(),
+                    _ => panic!("Unimplemented opcode: {}", self.opcode),
                 }
             },
-            _ => (),
+            _ => panic!("Unimplemented opcode: {}", self.opcode),
         }
     }
 
