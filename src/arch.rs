@@ -1,12 +1,12 @@
 use crate::gfx;
 
 struct Opcode {
-    value:   u16,
+    value: u16,
     // Registers are usize because rust forces indexing to be as usize,
     // even when the indexes are of a smaller type and thus are in (compile-time) bounds.
     // TODO: We will enforce that they are in bounds at execution time.
-    xreg:    usize, // "X" register in opcode table. 0 if unused, max 16.
-    yreg:    usize, // 0 if unused.
+    xreg: usize,  // "X" register in opcode table. 0 if unused, max 16.
+    yreg: usize,  // 0 if unused.
     literal: u16, // Last three hex digits of our opcode.
 }
 
@@ -19,15 +19,18 @@ impl Opcode {
             value,
             xreg,
             yreg,
-            literal: value & 0xFFF
+            literal: value & 0xFFF,
         }
     }
 }
 
 impl std::fmt::Display for Opcode {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Value: 0x{:x} Xreg: {} Yreg: {} Literal: {}",
-            self.value, self.xreg, self.yreg, self.literal)
+        write!(
+            f,
+            "Value: 0x{:x} Xreg: {} Yreg: {} Literal: {}",
+            self.value, self.xreg, self.yreg, self.literal
+        )
     }
 }
 
@@ -64,8 +67,7 @@ struct Chip8 {
     // Debug components.
     debug: bool,
     count: i32,
-    cycle_rate: i32 // should be a time duration
-
+    cycle_rate: i32, // should be a time duration
 }
 
 trait InstructionSet {
@@ -119,13 +121,12 @@ impl InstructionSet for Chip8 {
 
     fn add(&mut self) {
         let literal = (self.opcode.value & 0xFF) as u8;
-        self.registers[self.opcode.xreg] =
-            self.registers[self.opcode.xreg].wrapping_add(literal);
+        self.registers[self.opcode.xreg] = self.registers[self.opcode.xreg].wrapping_add(literal);
     }
 
     fn add_with_carry(&mut self) {
-        let (sum, overflowed) = self.registers[self.opcode.xreg].
-            overflowing_add(self.registers[self.opcode.yreg]);
+        let (sum, overflowed) =
+            self.registers[self.opcode.xreg].overflowing_add(self.registers[self.opcode.yreg]);
 
         self.registers[self.opcode.xreg] = sum;
         self.registers[0xF] = overflowed as u8;
@@ -133,33 +134,30 @@ impl InstructionSet for Chip8 {
 
     fn or(&mut self) {
         let opcode = &self.opcode;
-        self.registers[opcode.xreg] =
-            self.registers[opcode.xreg] | self.registers[opcode.yreg];
+        self.registers[opcode.xreg] = self.registers[opcode.xreg] | self.registers[opcode.yreg];
     }
 
     fn and(&mut self) {
         let opcode = &self.opcode;
-        self.registers[opcode.xreg] =
-            self.registers[opcode.xreg] & self.registers[opcode.yreg];
+        self.registers[opcode.xreg] = self.registers[opcode.xreg] & self.registers[opcode.yreg];
     }
 
     fn xor(&mut self) {
         let opcode = &self.opcode;
-        self.registers[opcode.xreg] =
-            self.registers[opcode.xreg] ^ self.registers[opcode.yreg];
+        self.registers[opcode.xreg] = self.registers[opcode.xreg] ^ self.registers[opcode.yreg];
     }
 
     fn sub_x_from_y(&mut self) {
-        let (diff, underflowed) = self.registers[self.opcode.yreg].
-            overflowing_sub(self.registers[self.opcode.xreg]);
+        let (diff, underflowed) =
+            self.registers[self.opcode.yreg].overflowing_sub(self.registers[self.opcode.xreg]);
 
         self.registers[self.opcode.xreg] = diff;
         self.registers[0xF] = !underflowed as u8; // inverted, save 0 on underflow
     }
 
     fn sub_y_from_x(&mut self) {
-        let (diff, underflowed) = self.registers[self.opcode.xreg].
-            overflowing_sub(self.registers[self.opcode.yreg]);
+        let (diff, underflowed) =
+            self.registers[self.opcode.xreg].overflowing_sub(self.registers[self.opcode.yreg]);
 
         self.registers[self.opcode.xreg] = diff;
         self.registers[0xF] = !underflowed as u8; // inverted, save 0 on underflow
@@ -180,7 +178,6 @@ impl InstructionSet for Chip8 {
         self.registers[0xF] = (val >> 7) & 0x1;
         self.registers[self.opcode.xreg] = val << 1;
     }
-
 }
 
 #[cfg(test)]
@@ -269,7 +266,6 @@ mod tests {
             assert_eq!(*val, 0, "Found non-zero value in stack");
         }
     }
-
 }
 
 impl Chip8 {
@@ -286,7 +282,6 @@ impl Chip8 {
             sp: 0,
             update_pc_cycles: 0,
             // TODO initialize random ng
-
             screen: gfx::Screen::new(640, 480, 64, 32, "Chip-8 Emulator".to_string()),
             fontset: [
                 0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -323,10 +318,7 @@ impl Chip8 {
     }
 
     // TODO: should return error instead
-    fn load_game(file_path: String) {
-
-
-    }
+    fn load_game(file_path: String) {}
 
     fn decode_exeucte(&mut self) {
         self.update_pc_cycles = 2; // unless overridden
@@ -338,32 +330,27 @@ impl Chip8 {
         }
 
         match value >> 12 {
-            0x0 => {
-                match value & 0xFF {
-                    0xEE => self.r#return(),
-                    _ => panic!("Unimplemented opcode: {}", self.opcode),
-                }
+            0x0 => match value & 0xFF {
+                0xEE => self.r#return(),
+                _ => panic!("Unimplemented opcode: {}", self.opcode),
             },
             0x1 => self.jump(),
             0x2 => self.call(),
             0x6 => self.set_reg_to_literal(),
             0x7 => self.add(),
-            0x8 => {
-                match value & 0xF {
-                    0x0 => self.set_reg_to_reg(),
-                    0x1 => self.or(),
-                    0x2 => self.and(),
-                    0x3 => self.xor(),
-                    0x4 => self.add_with_carry(),
-                    0x5 => self.sub_y_from_x(),
-                    0x6 => self.shift_right(),
-                    0x7 => self.sub_x_from_y(),
-                    0xE => self.shift_left(),
-                    _ => panic!("Unimplemented opcode: {}", self.opcode),
-                }
+            0x8 => match value & 0xF {
+                0x0 => self.set_reg_to_reg(),
+                0x1 => self.or(),
+                0x2 => self.and(),
+                0x3 => self.xor(),
+                0x4 => self.add_with_carry(),
+                0x5 => self.sub_y_from_x(),
+                0x6 => self.shift_right(),
+                0x7 => self.sub_x_from_y(),
+                0xE => self.shift_left(),
+                _ => panic!("Unimplemented opcode: {}", self.opcode),
             },
             _ => panic!("Unimplemented opcode: {}", self.opcode),
         }
     }
-
 }

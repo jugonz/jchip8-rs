@@ -2,8 +2,8 @@
 #![allow(unused_imports)]
 
 use sdl2::event::Event;
-use sdl2::pixels::Color;
 use sdl2::keyboard::{Keycode, Scancode};
+use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 
 use std::time::Duration;
@@ -11,12 +11,24 @@ use std::time::Duration;
 extern crate sdl2;
 
 const KEYBOARD_LAYOUT: [Scancode; 16] = [
-    Scancode::Num0, Scancode::Num1, Scancode::Num2, Scancode::Num3,
-    Scancode::Num4, Scancode::Num5, Scancode::Num6, Scancode::Num7,
-    Scancode::Num8, Scancode::Num9, Scancode::A, Scancode::B,
-    Scancode::C, Scancode::D, Scancode::E, Scancode::F];
-const DISPLAY_SCALE : u32 = 15; // TODO: assert that all pixels fit
-
+    Scancode::Num0,
+    Scancode::Num1,
+    Scancode::Num2,
+    Scancode::Num3,
+    Scancode::Num4,
+    Scancode::Num5,
+    Scancode::Num6,
+    Scancode::Num7,
+    Scancode::Num8,
+    Scancode::Num9,
+    Scancode::A,
+    Scancode::B,
+    Scancode::C,
+    Scancode::D,
+    Scancode::E,
+    Scancode::F,
+];
+const DISPLAY_SCALE: u32 = 15; // TODO: assert that all pixels fit
 
 pub trait Drawable {
     fn draw(&mut self);
@@ -50,9 +62,7 @@ pub struct Screen {
 }
 
 impl Screen {
-    pub fn new(width: u32, height: u32,
-        res_width: u32, res_height: u32,
-        title: String) -> Screen {
+    pub fn new(width: u32, height: u32, res_width: u32, res_height: u32, title: String) -> Screen {
         Screen {
             width,
             height,
@@ -71,7 +81,8 @@ impl Screen {
         let sdl_context = sdl2::init().unwrap();
         let video_sbsys = sdl_context.video().unwrap();
 
-        let window = video_sbsys.window(&self.title, self.width, self.height)
+        let window = video_sbsys
+            .window(&self.title, self.width, self.height)
             .position_centered()
             .build()
             .unwrap();
@@ -103,7 +114,7 @@ impl Screen {
         // }
 
         self.sdl = Some(sdl_context); // TODO: At end!
-        // self.window = Some(window);
+                                      // self.window = Some(window);
         self.canvas = Some(canvas);
     }
 }
@@ -112,7 +123,6 @@ impl Drawable for Screen {
     fn draw(&mut self) {
         let canvas = self.canvas.as_mut().unwrap();
         canvas.set_draw_color(Color::RGB(0, 0, 0));
-
 
         for (xindex, xarr) in self.pixels.iter().enumerate() {
             for (yindex, pixel) in xarr.iter().enumerate() {
@@ -154,7 +164,13 @@ impl Drawable for Screen {
 impl Interactible for Screen {
     fn set_keys(&mut self) -> bool {
         for (index, key) in KEYBOARD_LAYOUT.into_iter().enumerate() {
-            if self.events.as_mut().unwrap().keyboard_state().is_scancode_pressed(key) {
+            if self
+                .events
+                .as_mut()
+                .unwrap()
+                .keyboard_state()
+                .is_scancode_pressed(key)
+            {
                 println!("{} was pressed!\n", key);
                 self.keyboard[index] = true;
             } else {
@@ -165,7 +181,7 @@ impl Interactible for Screen {
         // Seems like QUIT only comes in as an event from the event pump.
         // (If we wanted to quit upon a key press, we'd have to add a check for it around here.)
         for event in self.events.as_mut().unwrap().poll_iter() {
-            if let Event::Quit{..} = event {
+            if let Event::Quit { .. } = event {
                 println!("Quitting!\n");
                 return false;
             }
