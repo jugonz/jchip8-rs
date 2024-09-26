@@ -50,6 +50,47 @@ impl InstructionSet for Chip8 {
         self.update_pc_cycles = 0;
     }
 
+    fn jump_with_offset(&mut self) {
+        self.pc = self.opcode.literal + u16::from(self.registers[0]);
+        self.update_pc_cycles = 0;
+    }
+
+    fn skip_if_eq_literal(&mut self) {
+        // Here, the literal is just lower bits of value.
+        let literal = (self.opcode.value & 0xFF) as u8;
+        if self.registers[self.opcode.xreg] == literal {
+            self.update_pc_cycles = 4; // Skip an instruction.
+        }
+    }
+
+    fn skip_if_not_eq_literal(&mut self) {
+        // Here, the literal is just lower bits of value.
+        let literal = (self.opcode.value & 0xFF) as u8;
+        if self.registers[self.opcode.xreg] != literal {
+            self.update_pc_cycles = 4; // Skip an instruction.
+        }
+    }
+
+    fn skip_if_eq_reg(&mut self) {
+        if self.registers[self.opcode.xreg] == self.registers[self.opcode.yreg] {
+            self.update_pc_cycles = 4;
+        }
+    }
+
+    fn skip_if_not_eq_reg(&mut self) {
+        if self.registers[self.opcode.xreg] != self.registers[self.opcode.yreg] {
+            self.update_pc_cycles = 4;
+        }
+    }
+
+    fn skip_if_key_pressed(&mut self) {
+
+    }
+
+    fn skip_if_key_not_pressed(&mut self) {
+
+    }
+
     fn set_reg_to_literal(&mut self) {
         let literal = (self.opcode.value & 0xFF) as u8;
         self.registers[self.opcode.xreg] += literal;
@@ -119,6 +160,59 @@ impl InstructionSet for Chip8 {
         self.registers[0xF] = (val >> 7) & 0x1;
         self.registers[self.opcode.xreg] = val << 1;
     }
+
+    fn save_binary_coded_decimal(&mut self) {
+        let val = self.registers[self.opcode.xreg];
+
+        // Store the decimal representation of val in memory so that
+        // the hundreths digit of the value is in Mem[Index],
+        // the tenths digit is in Mem[Index+1], and
+        // the ones digit is in Mem[Index+2].
+        self.memory[self.index_reg as usize] = val / 100;
+        self.memory[(self.index_reg + 1) as usize] = (val / 10) % 10;
+        self.memory[(self.index_reg + 2) as usize] = (val % 100) % 10;
+    }
+
+    // Manipulating special registers.
+    fn add_reg_to_index_reg(&mut self) {
+        self.index_reg += u16::from(self.registers[self.opcode.xreg]);
+    }
+
+    fn set_index_reg_to_literal(&mut self) {
+        self.index_reg = self.opcode.literal;
+    }
+
+    fn get_delay_timer(&mut self) {
+        self.registers[self.opcode.xreg] = self.delay_timer;
+    }
+
+    fn set_delay_timer(&mut self) {
+        self.delay_timer = self.registers[self.opcode.xreg];
+    }
+
+    fn set_sound_timer(&mut self) {
+        self.sound_timer = self.registers[self.opcode.xreg];
+    }
+
+    // Context switching.
+    fn save_registers(&mut self) {
+        // Store all registers up to last register in memory,
+        // starting in memory at the location in the index register.
+        for (loc, reg) in (self.index_reg..).zip(0..self.opcode.xreg) {
+            // TODO: Technically overflow could happen here?
+            self.memory[usize::from(loc)] = self.registers[reg];
+        }
+    }
+
+    fn restore_registers(&mut self) {
+        // Load all registers up to last register from memory,
+        // starting in memory at the location in the index register.
+        for (loc, reg) in (self.index_reg..).zip(0..self.opcode.xreg) {
+            // TODO: overflow
+            self.registers[reg] = self.memory[usize::from(loc)];
+        }
+
+    }
 }
 
 impl Chip8 {
@@ -170,9 +264,10 @@ impl Chip8 {
         c8
     }
 
-    fn decode_exeucte(&mut self) {
+    fn decode_execute(&mut self) {
         self.update_pc_cycles = 2; // unless overridden
         let value = self.opcode.value;
+        let lower_value = value & 0xFF;
 
         if self.debug {
             println!("Registers: {:?}", self.registers);
@@ -180,15 +275,18 @@ impl Chip8 {
         }
 
         match value >> 12 {
-            0x0 => match value & 0xFF {
+            0x0 => match lower_value {
                 0xEE => self.r#return(),
-                _ => panic!("Unimplemented opcode: {}", self.opcode),
+                _ => self.unknown_instruction(),
             },
             0x1 => self.jump(),
             0x2 => self.call(),
+            0x3 => self.skip_if_eq_literal(),
+            0x4 => self.skip_if_not_eq_literal(),
+            0x5 => self.skip_if_eq_reg(),
             0x6 => self.set_reg_to_literal(),
             0x7 => self.add(),
-            0x8 => match value & 0xF {
+            0x8 => match value & 0xF { // *NOT* lower_value!
                 0x0 => self.set_reg_to_reg(),
                 0x1 => self.or(),
                 0x2 => self.and(),
@@ -198,11 +296,38 @@ impl Chip8 {
                 0x6 => self.shift_right(),
                 0x7 => self.sub_x_from_y(),
                 0xE => self.shift_left(),
-                _ => panic!("Unimplemented opcode: {}", self.opcode),
+                _ => self.unknown_instruction(),
             },
-            _ => panic!("Unimplemented opcode: {}", self.opcode),
+            0x9 => self.skip_if_not_eq_reg(),
+            0xA => self.set_index_reg_to_literal(),
+            0xB => self.jump_with_offset(),
+            0xE => match lower_value {
+                0x9E => self.skip_if_key_pressed(),
+                0xA1 => self.skip_if_key_not_pressed(),
+                _ => self.unknown_instruction(),
+            },
+            0xF => match lower_value {
+                0x07 => self.get_delay_timer(),
+                0x15 => self.set_delay_timer(),
+                0x18 => self.set_sound_timer(),
+                0x1E => self.add_reg_to_index_reg(),
+                0x33 => self.save_binary_coded_decimal(),
+                0x55 => self.save_registers(),
+                0x65 => self.restore_registers(),
+                _ => self.unknown_instruction(),
+            }
+            _ => self.unknown_instruction(),
         }
     }
+
+    fn increment_pc(&mut self) {
+        self.pc += self.update_pc_cycles;
+    }
+
+    fn unknown_instruction(&self) {
+        panic!("Unimplemented opcode: {}", self.opcode);
+    }
+
 }
 
 
