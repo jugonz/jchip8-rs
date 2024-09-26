@@ -196,18 +196,18 @@ impl InstructionSet for Chip8 {
 
     // Context switching.
     fn save_registers(&mut self) {
-        // Store all registers up to last register in memory,
+        // Store all registers up to AND INCLUDING the last register in memory,
         // starting in memory at the location in the index register.
-        for (loc, reg) in (self.index_reg..).zip(0..self.opcode.xreg) {
+        for (loc, reg) in (self.index_reg..).zip(0..=self.opcode.xreg) {
             // TODO: Technically overflow could happen here?
             self.memory[usize::from(loc)] = self.registers[reg];
         }
     }
 
     fn restore_registers(&mut self) {
-        // Load all registers up to last register from memory,
+        // Load all registers up to AND INCLUDING the last register from memory,
         // starting in memory at the location in the index register.
-        for (loc, reg) in (self.index_reg..).zip(0..self.opcode.xreg) {
+        for (loc, reg) in (self.index_reg..).zip(0..=self.opcode.xreg) {
             // TODO: overflow
             self.registers[reg] = self.memory[usize::from(loc)];
         }

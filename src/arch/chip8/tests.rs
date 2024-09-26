@@ -147,3 +147,41 @@ fn shift() {
     assert_eq!(c8.registers[1], 0);
     assert_eq!(c8.registers[0xF], 1, "MSB of shifted number was not 1!");
 }
+
+#[test]
+fn save_restore_registers() {
+    let mut c8 = Chip8::new(true);
+
+    run_opcode(&mut c8, 0x71A1); // Reg 1 has A1.
+    run_opcode(&mut c8, 0x7206); // Reg 2 has 06.
+    run_opcode(&mut c8, 0x76D4); // Reg 6 has D4.
+    assert_eq!(c8.registers[1], 0xA1);
+    assert_eq!(c8.registers[2], 0x06);
+    assert_eq!(c8.registers[6], 0xD4);
+
+    // Set the index register to our memory save location
+    // (here, arbitrarily pick 0x345).
+    run_opcode(&mut c8, 0xA345);
+    assert_eq!(c8.index_reg, 0x345);
+
+    // Load registers (up to register 6) into memory.
+    run_opcode(&mut c8, 0xF655);
+    assert_eq!(c8.memory[0x346], 0xA1);
+    assert_eq!(c8.memory[0x347], 0x06);
+    assert_eq!(c8.memory[0x34B], 0xD4);
+
+    // Now, change registers 1 and 5.
+    run_opcode(&mut c8, 0x7101);
+    run_opcode(&mut c8, 0x75DD);
+    assert_eq!(c8.registers[1], 0xA2);
+    assert_eq!(c8.registers[5], 0xDD);
+    assert_eq!(c8.index_reg, 0x345, "Index register was spuriously updated!");
+
+    // Now, reload our registers with memory contents and check them.
+    run_opcode(&mut c8, 0xF665);
+    assert_eq!(c8.registers[1], 0xA1);
+    assert_eq!(c8.registers[2], 0x06);
+    assert_eq!(c8.registers[5], 0x00);
+    assert_eq!(c8.registers[6], 0xD4);
+    assert_eq!(c8.index_reg, 0x345, "Index register was spuriously updated!");
+}
