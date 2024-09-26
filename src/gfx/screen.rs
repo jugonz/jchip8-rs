@@ -7,6 +7,8 @@ use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 
 use std::time::Duration;
+use super::drawable::Drawable;
+use super::interactible::Interactible;
 
 extern crate sdl2;
 
@@ -30,23 +32,6 @@ const KEYBOARD_LAYOUT: [Scancode; 16] = [
 ];
 const DISPLAY_SCALE: u32 = 15; // TODO: assert that all pixels fit
 
-pub trait Drawable {
-    fn draw(&mut self);
-    fn clear_screen(&mut self);
-    fn xor_pixel(&mut self, x: u16, y: u16);
-
-    fn get_pixel(&self, x: u16, y: u16) -> bool;
-    fn in_bounds(&self, x: u16, y: u16) -> bool;
-}
-
-pub trait Interactible {
-    fn set_keys(&mut self) -> bool; // false if should exit
-
-    fn is_key_pressed(&self, key: u8) -> bool;
-    // fn should_close(&self) -> bool;
-
-    // fn quit(&mut self);
-}
 
 pub struct Screen {
     width: u32,

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use crate::gfx;
 use crate::arch::opcode::Opcode;
+use super::instruction_set::InstructionSet;
 
 struct Chip8 {
     // Core structural components.
@@ -25,26 +26,6 @@ struct Chip8 {
     debug: bool,
     count: i32,
     cycle_rate: i32, // should be a time duration
-}
-
-trait InstructionSet {
-    fn call(&mut self);
-    fn r#return(&mut self);
-    fn jump(&mut self);
-
-    // Manipulating data registers
-    fn set_reg_to_literal(&mut self);
-    fn set_reg_to_reg(&mut self);
-
-    fn add(&mut self);
-    fn add_with_carry(&mut self);
-    fn or(&mut self);
-    fn and(&mut self);
-    fn xor(&mut self);
-    fn sub_x_from_y(&mut self);
-    fn sub_y_from_x(&mut self);
-    fn shift_right(&mut self);
-    fn shift_left(&mut self);
 }
 
 impl InstructionSet for Chip8 {

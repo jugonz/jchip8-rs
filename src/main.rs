@@ -1,9 +1,8 @@
 #![allow(dead_code)]
 
-use crate::gfx::Interactible;
-extern crate sdl2;
+use gfx::Interactible;
 
-pub mod arch;
+// pub mod arch;
 pub mod gfx;
 
 fn main() {
