@@ -1,13 +1,9 @@
-#![allow(dead_code)]
+use arch::{Emulator, chip8};
 
-use gfx::Interactible;
-
-// pub mod arch;
+pub mod arch;
 pub mod gfx;
 
 fn main() {
-    let mut screen = gfx::Screen::new(300, 300, 64, 32, String::from("Chip-8 Emulator"));
-    screen.init();
-
-    while screen.set_keys() {}
+    let mut emulator = chip8::Chip8::new(true);
+    emulator.test_init();
 }

@@ -1,9 +1,8 @@
 #![allow(dead_code)]
-use crate::gfx;
-use crate::arch::opcode::Opcode;
-use super::instruction_set::InstructionSet;
+use crate::gfx::{Interactible, Screen};
+use crate::arch::{Emulator, Opcode, InstructionSet};
 
-struct Chip8 {
+pub struct Chip8 {
     // Core structural components.
     opcode: Opcode, // reference?
     memory: [u8; 4096],
@@ -18,7 +17,7 @@ struct Chip8 {
     update_pc_cycles: u16, // Amount of cycles to update PC.
 
     // Interactive components.
-    screen: gfx::Screen,
+    screen: Screen,
     fontset: [u8; 80],
     draw_flag: bool,
 
@@ -220,7 +219,7 @@ impl Chip8 {
             sp: 0,
             update_pc_cycles: 0,
             // TODO initialize random ng
-            screen: gfx::Screen::new(640, 480, 64, 32, "Chip-8 Emulator".to_string()),
+            screen: Screen::new(640, 480, 64, 32, String::from("Chip-8 Emulator")),
             fontset: [
                 0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
                 0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -255,9 +254,6 @@ impl Chip8 {
         c8
     }
 
-    // TODO: should return error instead
-    fn load_game(file_path: String) {}
-
     fn decode_exeucte(&mut self) {
         self.update_pc_cycles = 2; // unless overridden
         let value = self.opcode.value;
@@ -291,4 +287,21 @@ impl Chip8 {
             _ => panic!("Unimplemented opcode: {}", self.opcode),
         }
     }
+}
+
+
+impl Emulator for Chip8 {
+    // TODO: should return error instead
+    fn load_game(&mut self, file_path: String) -> Result<(), std::io::Error> {
+
+        return Ok(());
+    }
+
+    fn test_init(&mut self) {
+        self.screen.init();
+
+        while self.screen.set_keys() {}
+    }
+
+    fn run() {}
 }
