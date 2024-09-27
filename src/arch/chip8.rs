@@ -3,6 +3,8 @@
 use crate::gfx::{Drawable, Interactible, Hardware};
 use crate::arch::{Emulator, Opcode, InstructionSet};
 
+use std::{fs, thread, time};
+
 #[cfg(test)]
 mod tests;
 
@@ -26,8 +28,8 @@ pub struct Chip8 {
 
     // Debug components.
     debug: bool,
-    count: i32,
-    cycle_rate: i32, // should be a time duration
+    count: u64,
+    cycle_rate: u64, // should be a time duration
 }
 
 impl InstructionSet for Chip8 {
@@ -144,7 +146,7 @@ impl InstructionSet for Chip8 {
 
     fn set_reg_to_literal(&mut self) {
         let literal = self.opcode.value as u8;
-        self.registers[self.opcode.xreg] += literal;
+        self.registers[self.opcode.xreg] = literal;
     }
 
     fn set_reg_to_reg(&mut self) {
@@ -301,7 +303,6 @@ impl Chip8 {
             stack: [0; 16],
             sp: 0,
             update_pc_cycles: 0,
-            // TODO initialize random ng
             hardware: Hardware::new(640, 480, 64, 32, String::from("Chip-8 Emulator")),
             fontset: [
                 0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -325,7 +326,7 @@ impl Chip8 {
 
             debug,
             count: 0,
-            cycle_rate: 1024, // TODO fix
+            cycle_rate: 1666667, // 60hz
         };
 
         // Load the fontset into memory.
@@ -436,6 +437,7 @@ impl Chip8 {
         self.fetch_opcode();
         if self.debug {
             println!("On cycle {}, at memory location {}", self.count, self.pc);
+            self.count += 1;
         }
 
         self.decode_execute();
@@ -452,8 +454,12 @@ impl Chip8 {
 
 
 impl Emulator for Chip8 {
-    // TODO: should return error instead
     fn load_game(&mut self, file_path: String) -> Result<(), std::io::Error> {
+        let contents : Vec<u8> = fs::read(file_path)?; // Handles all errors!
+
+        for (index, value) in contents.into_iter().enumerate() {
+            self.memory[0x200 + index] = value;
+        }
 
         return Ok(());
     }
@@ -464,5 +470,12 @@ impl Emulator for Chip8 {
         while self.hardware.set_keys() {}
     }
 
-    fn run() {}
+    fn run(&mut self) {
+        self.hardware.init();
+
+        loop {
+            self.emulate_cycle();
+            thread::sleep(time::Duration::from_nanos(self.cycle_rate));
+        }
+    }
 }

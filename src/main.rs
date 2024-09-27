@@ -5,5 +5,9 @@ pub mod gfx;
 
 fn main() {
     let mut emulator = chip8::Chip8::new(true);
-    emulator.test_init();
+    emulator.load_game(String::from("c8games/PONG")).unwrap();
+    emulator.run();
+
+
+    // emulator.test_init();
 }

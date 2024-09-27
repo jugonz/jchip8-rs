@@ -7,13 +7,16 @@ fn run_opcode(c8: &mut Chip8, instruction: u16) {
 
 #[test]
 fn setup() {
-    let c8 = Chip8::new(true);
+    let mut c8 = Chip8::new(true);
     assert_eq!(c8.pc, 0x200);
 
     let fontset_clear = c8.fontset.iter().all(|x| *x == 0);
     assert_eq!(fontset_clear, false);
 
-    // TODO: Load a game and some well-known values in memory.
+    // Load a game and assert some well-known values were loaded into memory.
+    c8.load_game(String::from("c8games/PONG2")).unwrap();
+    assert_eq!(c8.memory[0x200], 0x22);
+    assert_eq!(c8.memory[0x307], 0xEE);
 }
 
 #[test]
