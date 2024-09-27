@@ -113,7 +113,9 @@ impl Drawable for Hardware {
     fn draw(&mut self) {
         let canvas = self.canvas.as_mut().unwrap();
         canvas.set_draw_color(Color::RGB(0, 0, 0));
+        canvas.clear();
 
+        canvas.set_draw_color(Color::RGB(255, 255, 255));
         for (xindex, xarr) in self.pixels.iter().enumerate() {
             for (yindex, pixel) in xarr.iter().enumerate() {
                 if *pixel {
