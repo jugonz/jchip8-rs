@@ -33,7 +33,7 @@ const KEYBOARD_LAYOUT: [Scancode; 16] = [
 const DISPLAY_SCALE: u32 = 15; // TODO: assert that all pixels fit
 
 
-pub struct Screen {
+pub struct Hardware {
     width: u32,
     height: u32,
     res_width: u32,
@@ -46,9 +46,9 @@ pub struct Screen {
     keyboard: [bool; 16], // True if a key is pressed.
 }
 
-impl Screen {
-    pub fn new(width: u32, height: u32, res_width: u32, res_height: u32, title: String) -> Screen {
-        Screen {
+impl Hardware {
+    pub fn new(width: u32, height: u32, res_width: u32, res_height: u32, title: String) -> Hardware {
+        Hardware {
             width,
             height,
             res_width,
@@ -104,7 +104,7 @@ impl Screen {
     }
 }
 
-impl Drawable for Screen {
+impl Drawable for Hardware {
     fn draw(&mut self) {
         let canvas = self.canvas.as_mut().unwrap();
         canvas.set_draw_color(Color::RGB(0, 0, 0));
@@ -112,7 +112,7 @@ impl Drawable for Screen {
         for (xindex, xarr) in self.pixels.iter().enumerate() {
             for (yindex, pixel) in xarr.iter().enumerate() {
                 if *pixel {
-                    // TODO: check if i32::from() is better
+                    // TODO: casting check?
                     let xcoord = ((xindex as u32) * DISPLAY_SCALE) as i32;
                     let ycoord = ((yindex as u32) * DISPLAY_SCALE) as i32;
 
@@ -146,7 +146,7 @@ impl Drawable for Screen {
     }
 }
 
-impl Interactible for Screen {
+impl Interactible for Hardware {
     fn set_keys(&mut self) -> bool {
         for (index, key) in KEYBOARD_LAYOUT.into_iter().enumerate() {
             if self
@@ -175,7 +175,11 @@ impl Interactible for Screen {
         return true;
     }
 
-    fn is_key_pressed(&self, key: u8) -> bool {
+    fn get_keys(&self) -> &[bool] {
+        return &self.keyboard;
+    }
+
+    fn key_is_pressed(&self, key: u8) -> bool {
         return self.keyboard[key as usize];
     }
 

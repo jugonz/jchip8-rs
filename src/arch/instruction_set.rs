@@ -1,4 +1,9 @@
 pub trait InstructionSet {
+    // Graphics controls
+    fn clear_screen(&mut self);
+    fn set_index_reg_to_sprite(&mut self);
+
+    // Control flow
     fn call(&mut self);
     fn r#return(&mut self);
     fn jump(&mut self);
@@ -23,11 +28,13 @@ pub trait InstructionSet {
     fn sub_y_from_x(&mut self);
     fn shift_right(&mut self);
     fn shift_left(&mut self);
+    fn set_reg_random_mask(&mut self);
     fn save_binary_coded_decimal(&mut self);
 
     // Manipulating special registers.
     fn add_reg_to_index_reg(&mut self);
     fn set_index_reg_to_literal(&mut self);
+    fn get_key_press(&mut self);
     fn get_delay_timer(&mut self);
     fn set_delay_timer(&mut self);
     fn set_sound_timer(&mut self);
