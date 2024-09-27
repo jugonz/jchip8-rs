@@ -36,6 +36,39 @@ impl InstructionSet for Chip8 {
         self.draw_flag = true;
     }
 
+    fn draw_sprite(&mut self) {
+        let x_coord : u16 = self.registers[self.opcode.xreg].into();
+        let y_coord : u16 = self.registers[self.opcode.yreg].into();
+        let height = self.opcode.value & 0xF;
+        let width : u16 = 8; // Width is hardcoded on this platform.
+        let shift_constant : u16 = 0x80; // Shifting 128 bits right allow us to check individual bits.
+
+        self.registers[0xF] = 0; // Assume we don't unset any pixels.
+
+        for y_line in 0..height {
+            let pixel_offset = usize::from(self.index_reg) + usize::from(y_line);
+            let pixel = self.memory[pixel_offset];
+
+            for x_line in 0..width {
+
+                let x = x_coord + x_line;
+                let y = y_coord + y_line;
+
+                // If we need to draw this pixel...
+                if (u16::from(pixel) & (shift_constant >> x_line)) > 0 &&
+                    self.hardware.in_bounds(x, y) {
+                        // XOR the pixel, saving whether we set it here.
+                        if self.hardware.get_pixel(x, y) {
+                            self.registers[0xF] = 1;
+                        }
+                        self.hardware.xor_pixel(x, y);
+                }
+            }
+        }
+
+        self.draw_flag = true;
+    }
+
     fn set_index_reg_to_sprite(&mut self) {
         let character = u16::from(self.registers[self.opcode.xreg]);
         // Number of sprites per character.
@@ -355,7 +388,7 @@ impl Chip8 {
             0xA => self.set_index_reg_to_literal(),
             0xB => self.jump_with_offset(),
             0xC => self.set_reg_random_mask(),
-            // TODO 0xD -> DrawSprite()
+            0xD => self.draw_sprite(),
             0xE => match lower_value {
                 0x9E => self.skip_if_key_pressed(),
                 0xA1 => self.skip_if_key_not_pressed(),

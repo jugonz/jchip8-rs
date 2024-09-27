@@ -6,7 +6,18 @@ fn run_opcode(c8: &mut Chip8, instruction: u16) {
 }
 
 #[test]
-fn test_skip_instruction() {
+fn setup() {
+    let c8 = Chip8::new(true);
+    assert_eq!(c8.pc, 0x200);
+
+    let fontset_clear = c8.fontset.iter().all(|x| *x == 0);
+    assert_eq!(fontset_clear, false);
+
+    // TODO: Load a game and some well-known values in memory.
+}
+
+#[test]
+fn skip_instruction() {
     let mut c8 = Chip8::new(true);
 
     // First, add the literal (A3) to a register.
@@ -35,6 +46,27 @@ fn test_skip_instruction() {
     run_opcode(&mut c8, 0x5120);
     c8.increment_pc();
     assert_eq!(c8.pc, 0x20E);
+}
+
+#[test]
+fn clear_screen() {
+    let mut c8 = Chip8::new(true);
+
+    // Draw something to the screen and assert that
+    // some pixels were set.
+    run_opcode(&mut c8, 0xD324);
+    let pixels = c8.hardware.get_pixels();
+
+    // If all pixels are false, clear is true.
+    let clear = pixels.iter().all(|x| x.iter().all(|&y| !y));
+    assert_eq!(clear, false, "DrawSprite failed to draw the screen!");
+
+    // Now, clear the screen, and check that it is empty.
+    run_opcode(&mut c8, 0x00E0);
+    let pixels = c8.hardware.get_pixels();
+
+    let clear = pixels.iter().all(|x| x.iter().all(|&y| !y));
+    assert_eq!(clear, true, "ClearScreen failed to clear the screen!");
 }
 
 #[test]

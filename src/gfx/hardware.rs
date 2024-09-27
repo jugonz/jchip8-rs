@@ -102,6 +102,11 @@ impl Hardware {
                                       // self.window = Some(window);
         self.canvas = Some(canvas);
     }
+
+    #[cfg(test)]
+    pub fn get_pixels(&self) -> &Vec<Vec<bool>> {
+        return &self.pixels;
+    }
 }
 
 impl Drawable for Hardware {

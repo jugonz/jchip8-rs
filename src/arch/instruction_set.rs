@@ -1,6 +1,7 @@
 pub trait InstructionSet {
     // Graphics controls
     fn clear_screen(&mut self);
+    fn draw_sprite(&mut self);
     fn set_index_reg_to_sprite(&mut self);
 
     // Control flow
