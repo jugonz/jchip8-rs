@@ -20,16 +20,18 @@ pub struct Chip8 {
     stack: [u16; 16],
     sp: u16,
     update_pc_cycles: u16, // Amount of cycles to update PC.
+    cycle_rate: u64, // should be a time duration
 
     // Interactive components.
     hardware: Hardware, // Interactible and Drawable
     fontset: [u8; 80],
     draw_flag: bool,
 
+    game_title: String,
+
     // Debug components.
     debug: bool,
     count: u64,
-    cycle_rate: u64, // should be a time duration
 }
 
 impl InstructionSet for Chip8 {
@@ -290,10 +292,11 @@ impl InstructionSet for Chip8 {
     }
 }
 
-impl Chip8 {
-    pub fn new(debug: bool) -> Chip8 {
+impl Default for Chip8 {
+    fn default() -> Chip8 {
         let mut c8 = Chip8 {
-            opcode: Opcode::new(0), // will be replaced
+            opcode: Opcode::default(), // will be replaced
+
             memory: [0; 4096],
             registers: [0; 16], // this is an emulator, we use wrapping arithmetic
             index_reg: 0,
@@ -303,7 +306,8 @@ impl Chip8 {
             stack: [0; 16],
             sp: 0,
             update_pc_cycles: 0,
-            hardware: Hardware::new(640, 480, 64, 32, String::from("Chip-8 Emulator")),
+
+            hardware: Hardware::new(0, 0, 0, 0, false, String::from("No game loaded")),
             fontset: [
                 0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
                 0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -323,19 +327,30 @@ impl Chip8 {
                 0xF0, 0x80, 0xF0, 0x80, 0x80, // F
             ],
             draw_flag: false,
-
-            debug,
-            count: 0,
             cycle_rate: 1666667, // 60hz
+
+            game_title: String::from("No game loaded"),
+
+            debug: false,
+            count: 0,
         };
 
         // Load the fontset into memory.
-        for item in c8.fontset.into_iter().enumerate() {
-            let (i, v): (usize, u8) = item;
-            c8.memory[i] = v;
+        for (item, value) in c8.fontset.iter().enumerate() {
+            c8.memory[item] = *value;
         }
 
         c8
+    }
+}
+
+impl Chip8 {
+    pub fn new(debug: bool) -> Chip8 {
+        Chip8 {
+            hardware: Hardware::new(640, 480, 64, 32, debug, String::from("Chip-8 Emulator")),
+            debug,
+            ..Default::default()
+        }
     }
 
     fn fetch_opcode(&mut self) {
@@ -432,7 +447,7 @@ impl Chip8 {
         self.pc += self.update_pc_cycles;
     }
 
-    fn emulate_cycle(&mut self) {
+    fn emulate_cycle(&mut self) -> bool { // Returns false if we decided to stop.
         // Emulate one cycle of our operation.
         self.fetch_opcode();
         if self.debug {
@@ -442,9 +457,13 @@ impl Chip8 {
 
         self.decode_execute();
         self.draw_screen();
-        self.hardware.set_keys();
+        if !self.hardware.set_keys() {
+            return false // An exit key was pressed.
+        }
         self.update_timers();
         self.increment_pc();
+
+        return true
     }
 
     fn unknown_instruction(&self) {
@@ -455,26 +474,28 @@ impl Chip8 {
 
 impl Emulator for Chip8 {
     fn load_game(&mut self, file_path: String) -> Result<(), std::io::Error> {
+        self.game_title = file_path.clone();
+
         let contents : Vec<u8> = fs::read(file_path)?; // Handles all errors!
 
-        for (index, value) in contents.into_iter().enumerate() {
-            self.memory[0x200 + index] = value;
+        for (index, value) in contents.iter().enumerate() {
+            self.memory[0x200 + index] = *value;
         }
+
+        self.hardware.set_title(format!("chip8: {}", self.game_title.clone()));
 
         return Ok(());
     }
 
-    fn test_init(&mut self) {
-        self.hardware.init();
-
-        while self.hardware.set_keys() {}
-    }
-
     fn run(&mut self) {
+        if self.memory[0x200] == 0 {
+            // No game loaded. TODO: could be a cleaner check
+            return
+        }
+
         self.hardware.init();
 
-        loop {
-            self.emulate_cycle();
+        while self.emulate_cycle() {
             thread::sleep(time::Duration::from_nanos(self.cycle_rate));
         }
     }

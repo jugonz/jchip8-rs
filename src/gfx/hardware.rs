@@ -1,16 +1,10 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-
 use sdl2::event::Event;
-use sdl2::keyboard::{Keycode, Scancode};
+use sdl2::keyboard::Scancode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 
-use std::time::Duration;
 use super::drawable::Drawable;
 use super::interactible::Interactible;
-
-extern crate sdl2;
 
 const KEYBOARD_LAYOUT: [Scancode; 16] = [
     Scancode::Num0,
@@ -30,36 +24,41 @@ const KEYBOARD_LAYOUT: [Scancode; 16] = [
     Scancode::E,
     Scancode::F,
 ];
-const DISPLAY_SCALE: u32 = 15; // TODO: assert that all pixels fit
-
+const KEY_QUIT : Scancode = Scancode::Escape;
 
 pub struct Hardware {
     width: u32,
     height: u32,
     res_width: u32,
     res_height: u32,
+    debug: bool,
     pixels: Vec<Vec<bool>>,
     title: String,
     sdl: Option<sdl2::Sdl>,
     canvas: Option<sdl2::render::Canvas<sdl2::video::Window>>,
     events: Option<sdl2::EventPump>,
-    keyboard: [bool; 16], // True if a key is pressed.
+    keyboard: [bool; KEYBOARD_LAYOUT.len()], // True if a key is pressed.
 }
 
 impl Hardware {
-    pub fn new(width: u32, height: u32, res_width: u32, res_height: u32, title: String) -> Hardware {
+    pub fn new(width: u32, height: u32, res_width: u32, res_height: u32, debug: bool, title: String) -> Hardware {
         Hardware {
             width,
             height,
             res_width,
             res_height,
             pixels: vec![vec![false; res_height as usize]; res_width as usize],
+            debug,
             title,
             sdl: None,
             canvas: None,
             events: None,
             keyboard: [false; 16],
         }
+    }
+
+    pub fn set_title(&mut self, title: String) {
+        self.title = title
     }
 
     pub fn init(&mut self) {
@@ -77,29 +76,7 @@ impl Hardware {
         canvas.present();
 
         self.events = Some(sdl_context.event_pump().unwrap());
-
-        // let mut i = 0;
-        // 'running: loop {
-        //     i = (i + 1) % 255;
-        //     canvas.set_draw_color(Color::RGB(i, 64, 255 - i));
-        //     canvas.clear();
-        //     for event in events.poll_iter() {
-        //         match event {
-        //             Event::Quit {..} |
-        //             Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-        //                 break 'running
-        //             },
-        //             _ => {}
-        //         }
-        //     }
-        //     // The rest of the game loop goes here...
-
-        //     canvas.present();
-        //     ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
-        // }
-
-        self.sdl = Some(sdl_context); // TODO: At end!
-                                      // self.window = Some(window);
+        self.sdl = Some(sdl_context);
         self.canvas = Some(canvas);
     }
 
@@ -111,7 +88,11 @@ impl Hardware {
 
 impl Drawable for Hardware {
     fn draw(&mut self) {
-        let canvas = self.canvas.as_mut().unwrap();
+        // Return early if the canvas is gone.
+        let Some(canvas) = self.canvas.as_mut() else { return };
+
+        let display_scale = std::cmp::min(self.width / self.res_width, self.height / self.res_height);
+
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
 
@@ -119,11 +100,10 @@ impl Drawable for Hardware {
         for (xindex, xarr) in self.pixels.iter().enumerate() {
             for (yindex, pixel) in xarr.iter().enumerate() {
                 if *pixel {
-                    // TODO: casting check?
-                    let xcoord = ((xindex as u32) * DISPLAY_SCALE) as i32;
-                    let ycoord = ((yindex as u32) * DISPLAY_SCALE) as i32;
+                    let xcoord = ((xindex as u32) * display_scale) as i32;
+                    let ycoord = ((yindex as u32) * display_scale) as i32;
 
-                    let rect = Rect::new(xcoord, ycoord, DISPLAY_SCALE, DISPLAY_SCALE);
+                    let rect = Rect::new(xcoord, ycoord, display_scale, display_scale);
                     canvas.fill_rect(rect).unwrap();
                 }
             }
@@ -133,15 +113,13 @@ impl Drawable for Hardware {
     }
 
     fn clear_screen(&mut self) {
-        for x in self.pixels.iter_mut() {
-            for y in x.iter_mut() {
-                *y = false;
-            }
-        }
+        self.pixels.iter_mut().for_each(|x| x.fill(false));
     }
 
     fn xor_pixel(&mut self, x: u16, y: u16) {
-        self.pixels[x as usize][y as usize] = self.pixels[x as usize][y as usize] != true;
+        let x_us = usize::from(x);
+        let y_us = usize::from(y);
+        self.pixels[x_us][y_us] = self.pixels[x_us][y_us] != true;
     }
 
     fn get_pixel(&self, x: u16, y: u16) -> bool {
@@ -149,32 +127,49 @@ impl Drawable for Hardware {
     }
 
     fn in_bounds(&self, x: u16, y: u16) -> bool {
-        return (x as u32) < self.res_width && (y as u32) < self.res_height;
+        return (u32::from(x)) < self.res_width && (u32::from(y) as u32) < self.res_height;
     }
 }
 
 impl Interactible for Hardware {
     fn set_keys(&mut self) -> bool {
-        for (index, key) in KEYBOARD_LAYOUT.into_iter().enumerate() {
-            if self
-                .events
-                .as_mut()
-                .unwrap()
-                .keyboard_state()
-                .is_scancode_pressed(key)
-            {
-                println!("{} was pressed!\n", key);
+        let Some(event_pump) = &mut self.events else {
+            // If the event pump is gone, we're already quitting,
+            // so don't process any keys this cycle (and exit!).
+            return false
+        };
+
+        // Check for keyboard input.
+        let keyboard_state = event_pump.keyboard_state();
+        for (index, key) in KEYBOARD_LAYOUT.iter().enumerate() {
+            if keyboard_state.is_scancode_pressed(*key) {
+                if self.debug {
+                    println!("{} was pressed!", *key);
+                }
                 self.keyboard[index] = true;
             } else {
                 self.keyboard[index] = false;
             }
         }
 
-        // Seems like QUIT only comes in as an event from the event pump.
-        // (If we wanted to quit upon a key press, we'd have to add a check for it around here.)
-        for event in self.events.as_mut().unwrap().poll_iter() {
+        // Check if we need to quit.
+        // This can happen via either (a) the quit key being pressed
+        // or (b) the SDL quit event being sent through the event pump.
+
+        // (a)
+        if keyboard_state.is_scancode_pressed(KEY_QUIT) {
+            if self.debug {
+                println!("Quitting due to escape key!");
+            }
+            return false;
+        }
+
+        // (b)
+        for event in event_pump.poll_iter() {
             if let Event::Quit { .. } = event {
-                println!("Quitting!\n");
+                if self.debug {
+                    println!("Quitting!");
+                }
                 return false;
             }
         }
@@ -189,12 +184,4 @@ impl Interactible for Hardware {
     fn key_is_pressed(&self, key: u8) -> bool {
         return self.keyboard[key as usize];
     }
-
-    // fn should_close(&self) -> bool {
-    //     return false;
-    // }
-
-    // fn quit(&mut self) {
-
-    // }
 }
