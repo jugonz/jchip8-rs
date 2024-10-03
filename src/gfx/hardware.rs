@@ -71,11 +71,10 @@ impl Hardware {
         }
     }
 
-    pub fn set_title(&mut self, title: String) {
+    pub fn set_title(&mut self, title: String) -> Result<(), std::ffi::NulError> {
         self.title = title;
 
-        // TODO: error checking
-        let _ = self.canvas.window_mut().set_title(&self.title);
+        self.canvas.window_mut().set_title(&self.title)
     }
 
     pub fn init(&mut self) {

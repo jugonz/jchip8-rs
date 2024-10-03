@@ -477,16 +477,16 @@ impl Chip8 {
 impl Emulator for Chip8 {
     fn load_game(&mut self, file_path: String) -> Result<(), std::io::Error> {
         self.game_title = file_path.clone();
+        if let Err(err) = self.hardware.set_title(format!("chip8: {}", file_path.clone())) {
+            return Err(std::io::Error::from(err))
+        }
 
-        let contents : Vec<u8> = fs::read(file_path)?; // Handles all errors!
-
+        let contents : Vec<u8> = fs::read(file_path)?; // Handles all read errors!
         for (index, value) in contents.iter().enumerate() {
             self.memory[0x200 + index] = *value;
         }
 
-        self.hardware.set_title(format!("chip8: {}", self.game_title.clone()));
-
-        return Ok(());
+        Ok(())
     }
 
     fn run(&mut self) {
