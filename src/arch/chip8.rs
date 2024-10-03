@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
+use std::io::Write;
 use crate::gfx::{Drawable, Interactible, Hardware};
 use crate::arch::{Emulator, Opcode, InstructionSet};
 
@@ -439,6 +440,7 @@ impl Chip8 {
         }
         if self.sound_timer > 0 {
             print!("\x07"); // BEEP!
+            let _ = std::io::stdout().flush(); // If this fails, it's not a catastrophe.
             self.sound_timer -= 1;
         }
     }
