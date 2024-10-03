@@ -91,7 +91,8 @@ impl Drawable for Hardware {
         // Return early if the canvas is gone.
         let Some(canvas) = self.canvas.as_mut() else { return };
 
-        let display_scale = std::cmp::min(self.width / self.res_width, self.height / self.res_height);
+        let x_display_scale = self.width / self.res_width;
+        let y_display_scale = self.height / self.res_height;
 
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
@@ -100,10 +101,10 @@ impl Drawable for Hardware {
         for (xindex, xarr) in self.pixels.iter().enumerate() {
             for (yindex, pixel) in xarr.iter().enumerate() {
                 if *pixel {
-                    let xcoord = ((xindex as u32) * display_scale) as i32;
-                    let ycoord = ((yindex as u32) * display_scale) as i32;
+                    let xcoord = ((xindex as u32) * x_display_scale) as i32;
+                    let ycoord = ((yindex as u32) * y_display_scale) as i32;
 
-                    let rect = Rect::new(xcoord, ycoord, display_scale, display_scale);
+                    let rect = Rect::new(xcoord, ycoord, x_display_scale, y_display_scale);
                     canvas.fill_rect(rect).unwrap();
                 }
             }
