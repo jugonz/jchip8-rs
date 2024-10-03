@@ -25,6 +25,7 @@ const KEYBOARD_LAYOUT: [Scancode; 16] = [
     Scancode::F,
 ];
 const KEY_QUIT : Scancode = Scancode::Escape;
+const KEY_PAUSE : Scancode = Scancode::P;
 
 pub struct Hardware {
     width: u32,
@@ -157,7 +158,7 @@ impl Interactible for Hardware {
         // This can happen via either (a) the quit key being pressed
         // or (b) the SDL quit event being sent through the event pump.
 
-        // (a)
+        // Quit - (a)
         if keyboard_state.is_scancode_pressed(KEY_QUIT) {
             if self.debug {
                 println!("Quitting due to escape key!");
@@ -165,7 +166,67 @@ impl Interactible for Hardware {
             return false;
         }
 
-        // (b)
+        // Check if we need to pause.
+        if keyboard_state.is_scancode_pressed(KEY_PAUSE) {
+            if self.debug {
+                println!("Pausing!");
+            }
+            // Draw "Pause" icon here.
+
+            // Sit on the event pump until:
+            // (a) We need to quit.
+            //   Like below, this can happen if:
+            //     (1) quit is pressed
+            //     (2) we receive the Quit event
+            // (b) We get the pause event again (unpause).
+            //
+            //   This is slightly complicated - we don't want to accept
+            //   an unpause event until the pause key is first released
+            //   so given that we're in this block because the key was pressed,
+            //   we first wait for a KeyUp event for the pause key.
+            //   Once that's delivered, a KeyDown event followed by a KeyUp event
+            //   for the pause key will unpause the emulation.
+            //   Note that we can still quit while this is all happening.
+            let mut key_raised = false;
+            let mut key_released = false;
+            for event in event_pump.wait_iter() {
+                match event {
+                    // (a)
+                    Event::Quit { .. } | Event::KeyDown { scancode : Some(KEY_QUIT), .. } => {
+                        if self.debug {
+                            println!("Quitting!");
+                        }
+                        return false;
+                    },
+                    Event::KeyDown { scancode : Some(KEY_PAUSE), .. } if key_released => {
+                        if self.debug {
+                            println!("Saw Pause Keydown!");
+                        }
+                        key_raised = true;
+                    },
+                    Event::KeyUp { scancode : Some(KEY_PAUSE), .. } => {
+                        if key_raised {
+                            if self.debug {
+                                println!("Unpausing!");
+                            }
+                            // Clear "Pause" icon here.
+
+                            break;
+                        } else {
+                            if self.debug {
+                                println!("First key up!");
+                            }
+                            // Else, this is the key up from the actual pause press.
+                            key_released = true;
+                        }
+                    },
+                    _ => (),
+                }
+            }
+
+        }
+
+        // Quit - (b)
         for event in event_pump.poll_iter() {
             if let Event::Quit { .. } = event {
                 if self.debug {
