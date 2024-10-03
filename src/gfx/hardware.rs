@@ -35,39 +35,19 @@ pub struct Hardware {
     debug: bool,
     pixels: Vec<Vec<bool>>,
     title: String,
-    sdl: Option<sdl2::Sdl>,
-    canvas: Option<sdl2::render::Canvas<sdl2::video::Window>>,
+    sdl: sdl2::Sdl,
+    canvas: sdl2::render::Canvas<sdl2::video::Window>,
     events: Option<sdl2::EventPump>,
     keyboard: [bool; KEYBOARD_LAYOUT.len()], // True if a key is pressed.
 }
 
 impl Hardware {
     pub fn new(width: u32, height: u32, res_width: u32, res_height: u32, debug: bool, title: String) -> Hardware {
-        Hardware {
-            width,
-            height,
-            res_width,
-            res_height,
-            pixels: vec![vec![false; res_height as usize]; res_width as usize],
-            debug,
-            title,
-            sdl: None,
-            canvas: None,
-            events: None,
-            keyboard: [false; 16],
-        }
-    }
-
-    pub fn set_title(&mut self, title: String) {
-        self.title = title
-    }
-
-    pub fn init(&mut self) {
-        let sdl_context = sdl2::init().unwrap();
-        let video_sbsys = sdl_context.video().unwrap();
+        let sdl = sdl2::init().unwrap();
+        let video_sbsys = sdl.video().unwrap();
 
         let window = video_sbsys
-            .window(&self.title, self.width, self.height)
+            .window(&title, width, height)
             .position_centered()
             .build()
             .unwrap();
@@ -76,9 +56,34 @@ impl Hardware {
         canvas.clear();
         canvas.present();
 
-        self.events = Some(sdl_context.event_pump().unwrap());
-        self.sdl = Some(sdl_context);
-        self.canvas = Some(canvas);
+        Hardware {
+            width,
+            height,
+            res_width,
+            res_height,
+            pixels: vec![vec![false; res_height as usize]; res_width as usize],
+            debug,
+            title,
+            sdl,
+            canvas,
+            events: None,
+            keyboard: [false; 16],
+        }
+    }
+
+    pub fn set_title(&mut self, title: String) {
+        self.title = title;
+
+        // TODO: error checking
+        let _ = self.canvas.window_mut().set_title(&self.title);
+    }
+
+    pub fn init(&mut self) {
+        // This is a singleton - so we cannot reference the event pump
+        // *inside* of self.sdl inside of the constructor, since it's
+        // being moved there - it needs to be referenced elsewhere,
+        // like here.
+        self.events = Some(self.sdl.event_pump().unwrap());
     }
 
     #[cfg(test)]
@@ -89,16 +94,13 @@ impl Hardware {
 
 impl Drawable for Hardware {
     fn draw(&mut self) {
-        // Return early if the canvas is gone.
-        let Some(canvas) = self.canvas.as_mut() else { return };
-
         let x_display_scale = self.width / self.res_width;
         let y_display_scale = self.height / self.res_height;
 
-        canvas.set_draw_color(Color::RGB(0, 0, 0));
-        canvas.clear();
+        self.canvas.set_draw_color(Color::RGB(0, 0, 0));
+        self.canvas.clear();
 
-        canvas.set_draw_color(Color::RGB(255, 255, 255));
+        self.canvas.set_draw_color(Color::RGB(255, 255, 255));
         for (xindex, xarr) in self.pixels.iter().enumerate() {
             for (yindex, pixel) in xarr.iter().enumerate() {
                 if *pixel {
@@ -106,12 +108,12 @@ impl Drawable for Hardware {
                     let ycoord = ((yindex as u32) * y_display_scale) as i32;
 
                     let rect = Rect::new(xcoord, ycoord, x_display_scale, y_display_scale);
-                    canvas.fill_rect(rect).unwrap();
+                    self.canvas.fill_rect(rect).unwrap();
                 }
             }
         }
 
-        canvas.present();
+        self.canvas.present();
     }
 
     fn clear_screen(&mut self) {
