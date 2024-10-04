@@ -44,24 +44,23 @@ impl InstructionSet for Chip8 {
     fn draw_sprite(&mut self) {
         let x_coord : u16 = self.registers[self.opcode.xreg].into();
         let y_coord : u16 = self.registers[self.opcode.yreg].into();
-        let height = self.opcode.value & 0xF;
+        let height : u16 = self.opcode.value & 0xF;
         let width : u16 = 8; // Width is hardcoded on this platform.
         let shift_constant : u16 = 0x80; // Shifting 128 bits right allow us to check individual bits.
 
         self.registers[0xF] = 0; // Assume we don't unset any pixels.
 
         for y_line in 0..height {
-            let pixel_offset = usize::from(self.index_reg) + usize::from(y_line);
-            let pixel = self.memory[pixel_offset];
+            let pixel_offset : usize = (self.index_reg + y_line).into();
+            let pixel : u16 = self.memory[pixel_offset].into();
 
             for x_line in 0..width {
-
                 let x = x_coord + x_line;
                 let y = y_coord + y_line;
 
                 // If we need to draw this pixel...
-                if (u16::from(pixel) & (shift_constant >> x_line)) > 0 &&
-                    self.hardware.in_bounds(x, y) {
+                if (pixel & (shift_constant >> x_line)) > 0 &&
+                    self.hardware.in_bounds(u32::from(x), u32::from(y)) {
                         // XOR the pixel, saving whether we set it here.
                         if self.hardware.get_pixel(x, y) {
                             self.registers[0xF] = 1;
