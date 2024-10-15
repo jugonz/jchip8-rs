@@ -245,6 +245,8 @@ impl Drawable for Hardware {
         for (xindex, xarr) in self.pixels.iter().enumerate() {
             for (yindex, pixel) in xarr.iter().enumerate() {
                 if *pixel {
+                    // Since these indices are from our vector,
+                    // they should be safe to convert to / from 32-bit types.
                     let xcoord = ((xindex as u32) * self.x_display_scale) as i32;
                     let ycoord = ((yindex as u32) * self.y_display_scale) as i32;
 
@@ -263,9 +265,10 @@ impl Drawable for Hardware {
         self.canvas.clear();
 
         self.canvas.set_draw_color(Color::RGB(255, 255, 255));
-        let xcoord = (self.res_width / 2) - (self.res_width / 12); // roughly lhs of middle of screen
-        let ycoord = self.res_height / 3; // roughly top of middle of screen
+        let xcoord = (self.res_width / 2) - (self.res_width / 12); // Roughly lhs of middle of screen.
+        let ycoord = self.res_height / 3; // Roughly top of middle of screen.
         let height = self.height / 3;
+        // If the coordinate is in bounds, it should be safe to convert to / from 32-bit types.
         if self.in_bounds(xcoord, ycoord) {
             let rect = Rect::new(
                 (xcoord * self.x_display_scale) as i32,
@@ -276,13 +279,13 @@ impl Drawable for Hardware {
             self.canvas.fill_rect(rect).unwrap();
         }
 
-        let xcoord = (self.res_width / 2) + (self.res_width / 12); // roughly rhs of middle of screen
+        let xcoord = (self.res_width / 2) + (self.res_width / 12); // Roughly rhs of middle of screen.
         if self.in_bounds(xcoord, ycoord) {
             let rect = Rect::new(
                 (xcoord * self.x_display_scale) as i32,
                 (ycoord * self.y_display_scale) as i32,
                 self.x_display_scale,
-                height,
+                height, // Same height as other drawn rectangle.
             );
             self.canvas.fill_rect(rect).unwrap();
         }
@@ -295,8 +298,8 @@ impl Drawable for Hardware {
     }
 
     fn xor_pixel(&mut self, x: u16, y: u16) {
-        let x_us = usize::from(x);
-        let y_us = usize::from(y);
+        let x_us = x as usize;
+        let y_us = y as usize;
         self.pixels[x_us][y_us] = self.pixels[x_us][y_us] != true;
     }
 

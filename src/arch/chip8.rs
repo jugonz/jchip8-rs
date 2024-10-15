@@ -4,6 +4,10 @@ use std::io::Write;
 
 use std::{fs, thread, time};
 
+const NO_GAME_LOADED: &str = "No game loaded";
+const DEFAULT_TITLE: &str = "Chip-8 Emulator";
+const TITLE_PREFIX: &str = "chip8";
+
 #[cfg(test)]
 mod tests;
 
@@ -74,7 +78,7 @@ impl InstructionSet for Chip8 {
 
     fn set_index_reg_to_sprite(&mut self) {
         let character = u16::from(self.registers[self.opcode.xreg]);
-        // Number of sprites per character.
+        // Number of sprites per character. (If this overflows, something is very very wrong...)
         let offset = (self.fontset.len() / self.hardware.get_keys().len()) as u16;
 
         // Set the index register to the location of the
@@ -152,7 +156,7 @@ impl InstructionSet for Chip8 {
     }
 
     fn set_reg_to_literal(&mut self) {
-        let literal = self.opcode.value as u8;
+        let literal = self.opcode.value as u8; // Overflow is possible, but we ignore it.
         self.registers[self.opcode.xreg] = literal;
     }
 
@@ -162,7 +166,7 @@ impl InstructionSet for Chip8 {
     }
 
     fn add(&mut self) {
-        let literal = self.opcode.value as u8;
+        let literal = self.opcode.value as u8; // Overflow is possible, but we ignore it.
         self.registers[self.opcode.xreg] = self.registers[self.opcode.xreg].wrapping_add(literal);
     }
 
@@ -317,7 +321,7 @@ impl Default for Chip8 {
             sp: 0,
             update_pc_cycles: 0,
 
-            hardware: Hardware::new(640, 480, 64, 32, false, String::from("No game loaded")),
+            hardware: Hardware::new(640, 480, 64, 32, false, String::from(NO_GAME_LOADED)),
             fontset: [
                 0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
                 0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -339,7 +343,7 @@ impl Default for Chip8 {
             draw_flag: false,
             cycle_rate: 1666667, // 60hz
 
-            game_title: String::from("No game loaded"),
+            game_title: String::from(NO_GAME_LOADED),
 
             debug: false,
             count: 0,
@@ -357,7 +361,7 @@ impl Default for Chip8 {
 impl Chip8 {
     pub fn new(debug: bool) -> Chip8 {
         Chip8 {
-            hardware: Hardware::new(640, 480, 64, 32, debug, String::from("Chip-8 Emulator")),
+            hardware: Hardware::new(640, 480, 64, 32, debug, String::from(DEFAULT_TITLE)),
             debug,
             ..Default::default()
         }
@@ -494,7 +498,7 @@ impl Chip8 {
 
 impl Emulator for Chip8 {
     fn load_game(&mut self, file_path: String) -> Result<(), std::io::Error> {
-        self.hardware.set_title(format!("chip8: {}", file_path.clone()))?; // Handles title errors.
+        self.hardware.set_title(format!("{}: {}", TITLE_PREFIX, file_path.clone()))?; // Handles title errors.
         self.game_title = file_path.clone();
 
         let contents: Vec<u8> = fs::read(file_path)?; // Consume file_path and handle all read errors.
