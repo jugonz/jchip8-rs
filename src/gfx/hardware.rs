@@ -28,10 +28,13 @@ const KEY_QUIT: Scancode = Scancode::Escape;
 const KEY_PAUSE: Scancode = Scancode::P;
 
 pub struct Hardware {
+    #[allow(unused)]
     width: u32,
     height: u32,
     res_width: u32,
     res_height: u32,
+    x_display_scale: u32,
+    y_display_scale: u32,
     debug: bool,
     pixels: Vec<Vec<bool>>,
     title: String,
@@ -50,38 +53,55 @@ impl Hardware {
         debug: bool,
         title: String,
     ) -> Hardware {
-        let sdl = sdl2::init().unwrap();
-        let video_sbsys = sdl.video().unwrap();
+        // Check arguments.
+        if width == 0 || height == 0 || res_width == 0 || res_height == 0 {
+            panic!("Zero screen resolution provided: w{width} h{height} rw{res_width} rh{res_height}");
+        }
+        let x_display_scale = width / res_width;
+        let y_display_scale = height / res_height;
+        if x_display_scale == 0 {
+            panic!("Invalid screen resolution provided: w{width} does not divide into rw{res_width}");
+        } else if y_display_scale == 0 {
+            panic!("Invalid screen resolution provided: h{height} does not divide into rh{res_height}");
+        }
 
-        let window = video_sbsys
+        // We allow SDL initialization actions to fail with panics
+        // as that likely indicates a problem with SDL setup
+        // or misuse here!
+        let sdl = sdl2::init().unwrap();
+        let window = sdl
+            .video()
+            .unwrap()
             .window(&title, width, height)
             .position_centered()
             .build()
             .unwrap();
-        let mut canvas = window.into_canvas().build().unwrap();
-        canvas.set_draw_color(Color::RGB(0, 0, 0));
-        canvas.clear();
-        canvas.present();
 
         Hardware {
             width,
             height,
             res_width,
             res_height,
+            x_display_scale,
+            y_display_scale,
             pixels: vec![vec![false; res_height as usize]; res_width as usize],
             debug,
             title,
             sdl,
-            canvas,
+            canvas: window.into_canvas().build().unwrap(),
             events: None,
             keyboard: [false; 16],
         }
     }
 
-    pub fn set_title(&mut self, title: String) -> Result<(), std::ffi::NulError> {
+    pub fn set_title(&mut self, title: String) -> Result<(), std::io::Error> {
         self.title = title;
 
-        self.canvas.window_mut().set_title(&self.title)
+        if let Err(err) = self.canvas.window_mut().set_title(&self.title) {
+            Err(std::io::Error::from(err))
+        } else {
+            Ok(())
+        }
     }
 
     pub fn init(&mut self) {
@@ -218,9 +238,6 @@ impl Hardware {
 
 impl Drawable for Hardware {
     fn draw(&mut self) {
-        let x_display_scale = self.width / self.res_width;
-        let y_display_scale = self.height / self.res_height;
-
         self.canvas.set_draw_color(Color::RGB(0, 0, 0));
         self.canvas.clear();
 
@@ -228,10 +245,10 @@ impl Drawable for Hardware {
         for (xindex, xarr) in self.pixels.iter().enumerate() {
             for (yindex, pixel) in xarr.iter().enumerate() {
                 if *pixel {
-                    let xcoord = ((xindex as u32) * x_display_scale) as i32;
-                    let ycoord = ((yindex as u32) * y_display_scale) as i32;
+                    let xcoord = ((xindex as u32) * self.x_display_scale) as i32;
+                    let ycoord = ((yindex as u32) * self.y_display_scale) as i32;
 
-                    let rect = Rect::new(xcoord, ycoord, x_display_scale, y_display_scale);
+                    let rect = Rect::new(xcoord, ycoord, self.x_display_scale, self.y_display_scale);
                     self.canvas.fill_rect(rect).unwrap();
                 }
             }
@@ -242,22 +259,18 @@ impl Drawable for Hardware {
 
     fn draw_pause(&mut self) {
         // We want to draw a pause icon in the middle of the screen.
-        // TODO: these scales should probably live in the struct.
-        let x_display_scale = self.width / self.res_width;
-        let y_display_scale = self.height / self.res_height;
-
         self.canvas.set_draw_color(Color::RGB(0, 0, 0));
         self.canvas.clear();
-        self.canvas.set_draw_color(Color::RGB(255, 255, 255));
 
+        self.canvas.set_draw_color(Color::RGB(255, 255, 255));
         let xcoord = (self.res_width / 2) - (self.res_width / 12); // roughly lhs of middle of screen
         let ycoord = self.res_height / 3; // roughly top of middle of screen
         let height = self.height / 3;
         if self.in_bounds(xcoord, ycoord) {
             let rect = Rect::new(
-                (xcoord * x_display_scale) as i32,
-                (ycoord * y_display_scale) as i32,
-                x_display_scale,
+                (xcoord * self.x_display_scale) as i32,
+                (ycoord * self.y_display_scale) as i32,
+                self.x_display_scale,
                 height,
             );
             self.canvas.fill_rect(rect).unwrap();
@@ -266,9 +279,9 @@ impl Drawable for Hardware {
         let xcoord = (self.res_width / 2) + (self.res_width / 12); // roughly rhs of middle of screen
         if self.in_bounds(xcoord, ycoord) {
             let rect = Rect::new(
-                (xcoord * x_display_scale) as i32,
-                (ycoord * y_display_scale) as i32,
-                x_display_scale,
+                (xcoord * self.x_display_scale) as i32,
+                (ycoord * self.y_display_scale) as i32,
+                self.x_display_scale,
                 height,
             );
             self.canvas.fill_rect(rect).unwrap();

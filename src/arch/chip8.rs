@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
 use crate::arch::{Emulator, InstructionSet, Opcode};
 use crate::gfx::{Drawable, Hardware, Interactible};
 use std::io::Write;
@@ -11,21 +9,21 @@ mod tests;
 
 pub struct Chip8 {
     // Core structural components.
-    opcode: Opcode, // reference?
-    memory: [u8; 4096],
+    opcode: Opcode,
+    memory: [u8; 4096], // [0x0, 0x200) are reserved for our own use.
     registers: [u8; 16],
     index_reg: u16,
     pc: u16,
     delay_timer: u8,
     sound_timer: u8,
     stack: [u16; 16],
-    sp: u16,
+    sp: u8,
     update_pc_cycles: u16, // Amount of cycles to update PC.
-    cycle_rate: u64,       // should be a time duration
+    cycle_rate: u64,       // How fast to run one cycle in nanoseconds.
 
     // Interactive components.
-    hardware: Hardware, // Interactible and Drawable
-    fontset: [u8; 80],
+    hardware: Hardware, // Interactible and Drawable.
+    fontset: [u8; 80],  // Essentially hardcoded fonts to draw with.
     draw_flag: bool,
 
     game_title: String,
@@ -86,7 +84,7 @@ impl InstructionSet for Chip8 {
 
     fn call(&mut self) {
         self.stack[self.sp as usize] = self.pc;
-        self.sp += 1; // TODO: Overflow?
+        self.sp += 1; // Allow overflow to panic - the stack is only 16 entries anyway.
 
         self.pc = self.opcode.literal;
         self.update_pc_cycles = 0; // since we just changed PC manually
@@ -256,7 +254,7 @@ impl InstructionSet for Chip8 {
 
         for (key, pressed) in keyboard.iter().enumerate() {
             if *pressed {
-                // TODO: if key as u8 overflows, weird stuff happens.
+                // If key as u8 overflows u8, the instruction was invalid!
                 self.registers[self.opcode.xreg] = key as u8;
                 return;
             }
@@ -282,18 +280,24 @@ impl InstructionSet for Chip8 {
     fn save_registers(&mut self) {
         // Store all registers up to AND INCLUDING the last register in memory,
         // starting in memory at the location in the index register.
-        for (loc, reg) in (self.index_reg..).zip(0..=self.opcode.xreg) {
-            // TODO: Technically overflow could happen here?
-            self.memory[usize::from(loc)] = self.registers[reg];
+        for (loc, reg) in (usize::from(self.index_reg)..).zip(0..=self.opcode.xreg) {
+            if loc >= self.memory.len() {
+                panic!("Cannot save save register {reg} to memory location {loc}: out of bounds!");
+            }
+
+            self.memory[loc] = self.registers[reg];
         }
     }
 
     fn restore_registers(&mut self) {
         // Load all registers up to AND INCLUDING the last register from memory,
         // starting in memory at the location in the index register.
-        for (loc, reg) in (self.index_reg..).zip(0..=self.opcode.xreg) {
-            // TODO: overflow
-            self.registers[reg] = self.memory[usize::from(loc)];
+        for (loc, reg) in (usize::from(self.index_reg)..).zip(0..=self.opcode.xreg) {
+            if loc >= self.memory.len() {
+                panic!("Cannot save load register {reg} from memory location {loc}: out of bounds!");
+            }
+
+            self.registers[reg] = self.memory[loc];
         }
     }
 }
@@ -313,7 +317,7 @@ impl Default for Chip8 {
             sp: 0,
             update_pc_cycles: 0,
 
-            hardware: Hardware::new(0, 0, 0, 0, false, String::from("No game loaded")),
+            hardware: Hardware::new(640, 480, 64, 32, false, String::from("No game loaded")),
             fontset: [
                 0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
                 0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -379,6 +383,14 @@ impl Chip8 {
         if self.debug {
             println!("Registers: {:?}", self.registers);
             println!("Executing opcode: {}", self.opcode);
+        }
+
+        // Make sure that xreg / yreg are sane,
+        // since we don't have Opcode::new() check that for us
+        // for easier indexing later on.
+        let max_register = self.registers.len() - 1;
+        if self.opcode.xreg > max_register || self.opcode.yreg > max_register {
+            panic!("Invalid register in opcode: {}", self.opcode);
         }
 
         match value >> 12 {
@@ -482,15 +494,10 @@ impl Chip8 {
 
 impl Emulator for Chip8 {
     fn load_game(&mut self, file_path: String) -> Result<(), std::io::Error> {
+        self.hardware.set_title(format!("chip8: {}", file_path.clone()))?; // Handles title errors.
         self.game_title = file_path.clone();
-        if let Err(err) = self
-            .hardware
-            .set_title(format!("chip8: {}", file_path.clone()))
-        {
-            return Err(std::io::Error::from(err));
-        }
 
-        let contents: Vec<u8> = fs::read(file_path)?; // Handles all read errors!
+        let contents: Vec<u8> = fs::read(file_path)?; // Consume file_path and handle all read errors.
         for (index, value) in contents.iter().enumerate() {
             self.memory[0x200 + index] = *value;
         }
@@ -499,8 +506,9 @@ impl Emulator for Chip8 {
     }
 
     fn run(&mut self) {
-        if self.memory[0x200] == 0 {
-            // No game loaded. TODO: could be a cleaner check
+        self.fetch_opcode();
+        if self.opcode == Opcode::default() {
+            // No game is loaded, so just exit.
             return;
         }
 

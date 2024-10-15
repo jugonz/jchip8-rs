@@ -1,9 +1,9 @@
 #[non_exhaustive] // don't allow init of Opcode outside this file
+#[derive(PartialEq)]
 pub struct Opcode {
     pub value: u16,
     // Registers are usize because rust forces indexing to be as usize,
     // even when the indexes are of a smaller type and thus are in (compile-time) bounds.
-    // TODO: We will enforce that they are in bounds at execution time.
     pub xreg: usize,  // "X" register in opcode table. 0 if unused, max 16.
     pub yreg: usize,  // 0 if unused.
     pub literal: u16, // Last three hex digits of our opcode.
