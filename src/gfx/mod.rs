@@ -1,7 +1,7 @@
 mod drawable;
-mod interactible;
 mod hardware;
+mod interactible;
 
 pub use drawable::Drawable;
-pub use interactible::Interactible;
 pub use hardware::Hardware;
+pub use interactible::Interactible;

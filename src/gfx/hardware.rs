@@ -24,8 +24,8 @@ const KEYBOARD_LAYOUT: [Scancode; 16] = [
     Scancode::E,
     Scancode::F,
 ];
-const KEY_QUIT : Scancode = Scancode::Escape;
-const KEY_PAUSE : Scancode = Scancode::P;
+const KEY_QUIT: Scancode = Scancode::Escape;
+const KEY_PAUSE: Scancode = Scancode::P;
 
 pub struct Hardware {
     width: u32,
@@ -42,7 +42,14 @@ pub struct Hardware {
 }
 
 impl Hardware {
-    pub fn new(width: u32, height: u32, res_width: u32, res_height: u32, debug: bool, title: String) -> Hardware {
+    pub fn new(
+        width: u32,
+        height: u32,
+        res_width: u32,
+        res_height: u32,
+        debug: bool,
+        title: String,
+    ) -> Hardware {
         let sdl = sdl2::init().unwrap();
         let video_sbsys = sdl.video().unwrap();
 
@@ -120,19 +127,29 @@ impl Hardware {
         for event in event_pump.wait_iter() {
             match event {
                 // (a)
-                Event::Quit { .. } | Event::KeyDown { scancode : Some(KEY_QUIT), .. } => {
+                Event::Quit { .. }
+                | Event::KeyDown {
+                    scancode: Some(KEY_QUIT),
+                    ..
+                } => {
                     if self.debug {
                         println!("Quitting!");
                     }
                     return false;
-                },
-                Event::KeyDown { scancode : Some(KEY_PAUSE), .. } if key_released => {
+                }
+                Event::KeyDown {
+                    scancode: Some(KEY_PAUSE),
+                    ..
+                } if key_released => {
                     if self.debug {
                         println!("Saw Pause Keydown!");
                     }
                     key_raised = true;
-                },
-                Event::KeyUp { scancode : Some(KEY_PAUSE), .. } => {
+                }
+                Event::KeyUp {
+                    scancode: Some(KEY_PAUSE),
+                    ..
+                } => {
                     if key_raised {
                         if self.debug {
                             println!("Unpausing!");
@@ -148,7 +165,7 @@ impl Hardware {
                         // Else, this is the key up from the actual pause press.
                         key_released = true;
                     }
-                },
+                }
                 _ => (),
             }
         }
@@ -164,7 +181,7 @@ impl Hardware {
 
         let Some(event_pump) = &mut self.events else {
             // If the event pump is gone, we're quitting by definition.
-            return false
+            return false;
         };
         let keyboard_state = event_pump.keyboard_state();
 
@@ -237,15 +254,23 @@ impl Drawable for Hardware {
         let ycoord = self.res_height / 3; // roughly top of middle of screen
         let height = self.height / 3;
         if self.in_bounds(xcoord, ycoord) {
-            let rect = Rect::new((xcoord * x_display_scale) as i32, (ycoord * y_display_scale) as i32,
-                x_display_scale, height);
+            let rect = Rect::new(
+                (xcoord * x_display_scale) as i32,
+                (ycoord * y_display_scale) as i32,
+                x_display_scale,
+                height,
+            );
             self.canvas.fill_rect(rect).unwrap();
         }
 
         let xcoord = (self.res_width / 2) + (self.res_width / 12); // roughly rhs of middle of screen
         if self.in_bounds(xcoord, ycoord) {
-            let rect = Rect::new((xcoord * x_display_scale) as i32, (ycoord * y_display_scale) as i32,
-                x_display_scale, height);
+            let rect = Rect::new(
+                (xcoord * x_display_scale) as i32,
+                (ycoord * y_display_scale) as i32,
+                x_display_scale,
+                height,
+            );
             self.canvas.fill_rect(rect).unwrap();
         }
 

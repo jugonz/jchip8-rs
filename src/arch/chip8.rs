@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
+use crate::arch::{Emulator, InstructionSet, Opcode};
+use crate::gfx::{Drawable, Hardware, Interactible};
 use std::io::Write;
-use crate::gfx::{Drawable, Interactible, Hardware};
-use crate::arch::{Emulator, Opcode, InstructionSet};
 
 use std::{fs, thread, time};
 
@@ -21,7 +21,7 @@ pub struct Chip8 {
     stack: [u16; 16],
     sp: u16,
     update_pc_cycles: u16, // Amount of cycles to update PC.
-    cycle_rate: u64, // should be a time duration
+    cycle_rate: u64,       // should be a time duration
 
     // Interactive components.
     hardware: Hardware, // Interactible and Drawable
@@ -42,30 +42,31 @@ impl InstructionSet for Chip8 {
     }
 
     fn draw_sprite(&mut self) {
-        let x_coord : u16 = self.registers[self.opcode.xreg].into();
-        let y_coord : u16 = self.registers[self.opcode.yreg].into();
-        let height : u16 = self.opcode.value & 0xF;
-        let width : u16 = 8; // Width is hardcoded on this platform.
-        let shift_constant : u16 = 0x80; // Shifting 128 bits right allow us to check individual bits.
+        let x_coord: u16 = self.registers[self.opcode.xreg].into();
+        let y_coord: u16 = self.registers[self.opcode.yreg].into();
+        let height: u16 = self.opcode.value & 0xF;
+        let width: u16 = 8; // Width is hardcoded on this platform.
+        let shift_constant: u16 = 0x80; // Shifting 128 bits right allow us to check individual bits.
 
         self.registers[0xF] = 0; // Assume we don't unset any pixels.
 
         for y_line in 0..height {
-            let pixel_offset : usize = (self.index_reg + y_line).into();
-            let pixel : u16 = self.memory[pixel_offset].into();
+            let pixel_offset: usize = (self.index_reg + y_line).into();
+            let pixel: u16 = self.memory[pixel_offset].into();
 
             for x_line in 0..width {
                 let x = x_coord + x_line;
                 let y = y_coord + y_line;
 
                 // If we need to draw this pixel...
-                if (pixel & (shift_constant >> x_line)) > 0 &&
-                    self.hardware.in_bounds(u32::from(x), u32::from(y)) {
-                        // XOR the pixel, saving whether we set it here.
-                        if self.hardware.get_pixel(x, y) {
-                            self.registers[0xF] = 1;
-                        }
-                        self.hardware.xor_pixel(x, y);
+                if (pixel & (shift_constant >> x_line)) > 0
+                    && self.hardware.in_bounds(u32::from(x), u32::from(y))
+                {
+                    // XOR the pixel, saving whether we set it here.
+                    if self.hardware.get_pixel(x, y) {
+                        self.registers[0xF] = 1;
+                    }
+                    self.hardware.xor_pixel(x, y);
                 }
             }
         }
@@ -135,13 +136,19 @@ impl InstructionSet for Chip8 {
     }
 
     fn skip_if_key_pressed(&mut self) {
-        if self.hardware.key_is_pressed(self.registers[self.opcode.xreg]) {
+        if self
+            .hardware
+            .key_is_pressed(self.registers[self.opcode.xreg])
+        {
             self.update_pc_cycles = 4;
         }
     }
 
     fn skip_if_key_not_pressed(&mut self) {
-        if !self.hardware.key_is_pressed(self.registers[self.opcode.xreg]) {
+        if !self
+            .hardware
+            .key_is_pressed(self.registers[self.opcode.xreg])
+        {
             self.update_pc_cycles = 4;
         }
     }
@@ -288,7 +295,6 @@ impl InstructionSet for Chip8 {
             // TODO: overflow
             self.registers[reg] = self.memory[usize::from(loc)];
         }
-
     }
 }
 
@@ -388,7 +394,8 @@ impl Chip8 {
             0x5 => self.skip_if_eq_reg(),
             0x6 => self.set_reg_to_literal(),
             0x7 => self.add(),
-            0x8 => match value & 0xF { // *NOT* lower_value!
+            0x8 => match value & 0xF {
+                // *NOT* lower_value!
                 0x0 => self.set_reg_to_reg(),
                 0x1 => self.or(),
                 0x2 => self.and(),
@@ -421,7 +428,7 @@ impl Chip8 {
                 0x55 => self.save_registers(),
                 0x65 => self.restore_registers(),
                 _ => self.unknown_instruction(),
-            }
+            },
             _ => self.unknown_instruction(),
         }
     }
@@ -448,7 +455,8 @@ impl Chip8 {
         self.pc += self.update_pc_cycles;
     }
 
-    fn emulate_cycle(&mut self) -> bool { // Returns false if we decided to stop.
+    fn emulate_cycle(&mut self) -> bool {
+        // Returns false if we decided to stop.
         // Emulate one cycle of our operation.
         self.fetch_opcode();
         if self.debug {
@@ -459,12 +467,12 @@ impl Chip8 {
         self.decode_execute();
         self.draw_screen();
         if !self.hardware.set_keys() {
-            return false // An exit key was pressed.
+            return false; // An exit key was pressed.
         }
         self.update_timers();
         self.increment_pc();
 
-        return true
+        return true;
     }
 
     fn unknown_instruction(&self) {
@@ -472,15 +480,17 @@ impl Chip8 {
     }
 }
 
-
 impl Emulator for Chip8 {
     fn load_game(&mut self, file_path: String) -> Result<(), std::io::Error> {
         self.game_title = file_path.clone();
-        if let Err(err) = self.hardware.set_title(format!("chip8: {}", file_path.clone())) {
-            return Err(std::io::Error::from(err))
+        if let Err(err) = self
+            .hardware
+            .set_title(format!("chip8: {}", file_path.clone()))
+        {
+            return Err(std::io::Error::from(err));
         }
 
-        let contents : Vec<u8> = fs::read(file_path)?; // Handles all read errors!
+        let contents: Vec<u8> = fs::read(file_path)?; // Handles all read errors!
         for (index, value) in contents.iter().enumerate() {
             self.memory[0x200 + index] = *value;
         }
@@ -491,7 +501,7 @@ impl Emulator for Chip8 {
     fn run(&mut self) {
         if self.memory[0x200] == 0 {
             // No game loaded. TODO: could be a cleaner check
-            return
+            return;
         }
 
         self.hardware.init();

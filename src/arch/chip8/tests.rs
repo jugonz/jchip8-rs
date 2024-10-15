@@ -155,13 +155,19 @@ fn sub() {
     run_opcode(&mut c8, 0x8125);
     assert_eq!(c8.registers[1], 0x9F);
     assert_eq!(c8.registers[2], 0x03);
-    assert_eq!(c8.registers[0xF], 1, "Register underflow was falsely reported!");
+    assert_eq!(
+        c8.registers[0xF], 1,
+        "Register underflow was falsely reported!"
+    );
 
     // Finally, subtract 1 (9F) from 2 (3), check for underflow.
     run_opcode(&mut c8, 0x8215);
     assert_eq!(c8.registers[1], 0x9F);
     assert_eq!(c8.registers[2], 0x64);
-    assert_eq!(c8.registers[0xF], 0, "Register underflow was falsely reported!");
+    assert_eq!(
+        c8.registers[0xF], 0,
+        "Register underflow was falsely reported!"
+    );
 }
 
 #[test]
@@ -210,7 +216,10 @@ fn save_restore_registers() {
     run_opcode(&mut c8, 0x75DD);
     assert_eq!(c8.registers[1], 0xA2);
     assert_eq!(c8.registers[5], 0xDD);
-    assert_eq!(c8.index_reg, 0x345, "Index register was spuriously updated!");
+    assert_eq!(
+        c8.index_reg, 0x345,
+        "Index register was spuriously updated!"
+    );
 
     // Now, reload our registers with memory contents and check them.
     run_opcode(&mut c8, 0xF665);
@@ -218,5 +227,8 @@ fn save_restore_registers() {
     assert_eq!(c8.registers[2], 0x06);
     assert_eq!(c8.registers[5], 0x00);
     assert_eq!(c8.registers[6], 0xD4);
-    assert_eq!(c8.index_reg, 0x345, "Index register was spuriously updated!");
+    assert_eq!(
+        c8.index_reg, 0x345,
+        "Index register was spuriously updated!"
+    );
 }

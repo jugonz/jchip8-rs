@@ -1,7 +1,7 @@
 pub mod arch;
 pub mod gfx;
 
-use arch::{Emulator, chip8};
+use arch::{chip8, Emulator};
 use clap::Parser;
 
 #[derive(Parser)]
