@@ -4,6 +4,7 @@ use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 
 use super::drawable::Drawable;
+use super::interactible::SetKeysResult;
 use super::interactible::Interactible;
 
 const KEYBOARD_LAYOUT: [Scancode; 16] = [
@@ -26,6 +27,7 @@ const KEYBOARD_LAYOUT: [Scancode; 16] = [
 ];
 const KEY_QUIT: Scancode = Scancode::Escape;
 const KEY_PAUSE: Scancode = Scancode::P;
+const KEY_SAVE_STATE: Scancode = Scancode::S;
 
 pub struct Hardware {
     #[allow(unused)]
@@ -170,6 +172,7 @@ impl Hardware {
                     scancode: Some(KEY_PAUSE),
                     ..
                 } => {
+                    // (b)
                     if key_raised {
                         if self.debug {
                             println!("Unpausing!");
@@ -313,11 +316,11 @@ impl Drawable for Hardware {
 }
 
 impl Interactible for Hardware {
-    fn set_keys(&mut self) -> bool {
+    fn set_keys(&mut self) -> SetKeysResult {
         let Some(event_pump) = &mut self.events else {
             // If the event pump is gone, we're already quitting,
             // so don't process any keys this cycle (and exit!).
-            return false;
+            return SetKeysResult::ShouldExit;
         };
 
         // Check for keyboard input.
@@ -333,16 +336,57 @@ impl Interactible for Hardware {
             }
         }
 
+        // Now that keys have been processed,
+        // check what action we will return to our caller.
+        //
+        // There are three actions:
+        // If a quit key has been pressed, we will ask our caller
+        // to start exiting. Otherwise, our caller will continue
+        // executing - but it may be asked to save its state out to disk.
+        //
+        // Processing this is slightly complicated, as we also
+        // handle pausing from this code as well first.
+        // We are guaranteed that when we run we are not paused,
+        // and we guarantee that we return unpaused - so
+        // any waiting is handled by pause-code invoked here.
+        // Note that quitting while paused is also supported,
+        // so both methods may instruct us to quit.
+        //
+        // Since pause-handling and quit-handling code both take control
+        // of the event pump, we must check if a save state was requested
+        // before we handle pausing (we don't support saving states during pauses).
+        // If either pause-handling code and quit-handling code
+        // told us to quit, we won't act on the save state request.
+        //
+        // Finally, it's important that quit-handling code runs last,
+        // as it cycles through the event pump and ensures we don't get
+        // duplicate results about any key presses (including pause / save state)
+        // the next time we're here.
+        let mut caller_action = SetKeysResult::ShouldContinue;
+
+        // Check if the save state key was pressed.
+        // If so, we'll return to our caller that it was pressed
+        // *only* if we're not pausing or quitting.
+        if keyboard_state.is_scancode_pressed(KEY_SAVE_STATE) {
+            println!("Saving state!");
+            caller_action = SetKeysResult::ShouldSaveState;
+        }
+
         // Check if we need to pause (and if so, if we quit during the pause).
+        // (We don't allow saving states while paused, so we'll ignore
+        // any key presses above for saving states.)
         if keyboard_state.is_scancode_pressed(KEY_PAUSE) {
             if !self.handle_pause() {
-                return false;
+                return SetKeysResult::ShouldExit;
             }
         }
 
-        // Check if we need to quit (this is more complicated than
-        // just a key being pressed).
-        return self.handle_quit();
+        // Check if we need to quit - if not,
+        // we'll continue (and save state if we saw the key press above).
+        match self.handle_quit() {
+            false => SetKeysResult::ShouldExit,
+            true => caller_action,
+        }
     }
 
     fn get_keys(&self) -> &[bool] {
@@ -351,5 +395,11 @@ impl Interactible for Hardware {
 
     fn key_is_pressed(&self, key: u8) -> bool {
         return self.keyboard[key as usize];
+    }
+}
+
+impl Default for Hardware {
+    fn default() -> Hardware {
+        Hardware::new(640, 480, 64, 32, false, String::from(""))
     }
 }

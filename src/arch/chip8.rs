@@ -1,5 +1,7 @@
 use crate::arch::{Emulator, InstructionSet, Opcode};
-use crate::gfx::{Drawable, Hardware, Interactible};
+use crate::gfx::{Drawable, Hardware, Interactible, SetKeysResult};
+use serde::{Serialize, Deserialize};
+use serde_with::serde_as;
 use std::io::Write;
 
 use std::{fs, thread, time};
@@ -11,9 +13,13 @@ const TITLE_PREFIX: &str = "chip8";
 #[cfg(test)]
 mod tests;
 
+#[serde_as]
+#[derive(Serialize, Deserialize)]
 pub struct Chip8 {
     // Core structural components.
+    #[serde(skip)]
     opcode: Opcode,
+    #[serde_as(as = "[_; 4096]")]
     memory: [u8; 4096], // [0x0, 0x200) are reserved for our own use.
     registers: [u8; 16],
     index_reg: u16,
@@ -26,13 +32,20 @@ pub struct Chip8 {
     cycle_rate: u64,       // How fast to run one cycle in nanoseconds.
 
     // Interactive components.
+    #[serde(skip)]
     hardware: Hardware, // Interactible and Drawable.
+    #[serde_as(as = "[_; 80]")] // We could skip serializing this but there is no default.
     fontset: [u8; 80],  // Essentially hardcoded fonts to draw with.
     draw_flag: bool,
 
+    #[serde(skip)]
     game_title: String,
 
+    #[serde(skip)]
+    save_state_path: Option<String>,
+
     // Debug components.
+    #[serde(skip)]
     debug: bool,
     count: u64,
 }
@@ -304,6 +317,51 @@ impl InstructionSet for Chip8 {
             self.registers[reg] = self.memory[loc];
         }
     }
+
+    // Save state handling.
+    fn save_state(&mut self) {
+        if let Some(path) = self.save_state_path.clone() {
+            if let Err(error) = self.to_state(&path) {
+                if self.debug {
+                    println!("Saving state failed: {error}");
+                }
+            }
+        }
+    }
+}
+
+// impl Serialize for Chip8 {
+
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer
+//     {
+//         let mut state = serializer.serialize_struct("Chip8", 4)?;
+//         // MEMORY
+//         state.serialize_seq("mm", &self.memory)?;
+//         // REGISTERS
+//         state.serialize_field("ir", &self.index_reg)?;
+//         state.serialize_field("pc", &self.pc)?;
+//         state.serialize_field("dt", &self.delay_timer)?;
+//         state.serialize_field("st", &self.sound_timer)?;
+//         // STACK
+//         state.serialize_field("sp", &self.sp)?;
+//         state.serialize_field("df", &self.draw_flag)?;
+
+//         state.end()
+//     }
+// }
+
+impl std::fmt::Display for Chip8 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f,
+            "Opcode: {}, Memory: {:?}, Registers: {:?} Index Reg:{} \
+            PC: {} Delay: {} Sound: {}, Stack: {:?}, SP: {}, \
+            UPC: {}, DF: {}, Save Path: {:?}, Count: {}",
+            self.opcode, self.memory, self.registers, self.index_reg,
+            self.pc, self.delay_timer, self.sound_timer, self.stack, self.sp,
+            self.update_pc_cycles, self.draw_flag, self.save_state_path, self.count)
+    }
 }
 
 impl Default for Chip8 {
@@ -344,6 +402,7 @@ impl Default for Chip8 {
             cycle_rate: 1666667, // 60hz
 
             game_title: String::from(NO_GAME_LOADED),
+            save_state_path: None,
 
             debug: false,
             count: 0,
@@ -359,11 +418,44 @@ impl Default for Chip8 {
 }
 
 impl Chip8 {
-    pub fn new(debug: bool) -> Chip8 {
+    pub fn new_with_state_path(debug: bool, save_state_path: Option<String>) -> Chip8 {
         Chip8 {
             hardware: Hardware::new(640, 480, 64, 32, debug, String::from(DEFAULT_TITLE)),
             debug,
+            save_state_path,
             ..Default::default()
+        }
+    }
+
+    pub fn new(debug: bool) -> Chip8 {
+        Self::new_with_state_path(debug, None)
+    }
+
+    pub fn from_state(file_path: &str, save_state_path: Option<String>) -> Result<Chip8, std::io::Error> {
+        let contents: Vec<u8> = fs::read(file_path)?; // Return errors inline.
+        let parsed_c8: Result<Chip8, serde_json::Error> = serde_json::from_slice(&contents);
+        match parsed_c8 {
+            Ok(mut c8) => {
+                c8.save_state_path = save_state_path;
+                println!("Loaded state is: {c8}");
+                c8.hardware.draw();
+                Ok(c8)
+            }
+            Err(error) => Err(std::io::Error::other(error)),
+        }
+    }
+
+    fn to_state(&mut self, to_file_path: &str) -> Result<(), std::io::Error> {
+        let mut save_file = fs::File::create(to_file_path)?;
+        match serde_json::to_vec(self) {
+            Ok(serialized_c8) => {
+                println!("Serialized state is: {serialized_c8:?}");
+                println!("In-memory state is: {self}");
+                let res = save_file.write_all(&serialized_c8);
+                std::thread::sleep(std::time::Duration::from_nanos(1000000000));
+                return res;
+            }
+            Err(error) => { Err(std::io::Error::other(error)) },
         }
     }
 
@@ -482,8 +574,10 @@ impl Chip8 {
 
         self.decode_execute();
         self.draw_screen();
-        if !self.hardware.set_keys() {
-            return false; // An exit key was pressed.
+        match self.hardware.set_keys() {
+            SetKeysResult::ShouldSaveState => self.save_state(),
+            SetKeysResult::ShouldExit => return false,
+            _ => (),
         }
         self.update_timers();
         self.increment_pc();

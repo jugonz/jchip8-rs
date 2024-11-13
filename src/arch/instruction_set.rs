@@ -43,4 +43,7 @@ pub trait InstructionSet {
     // Context switching.
     fn save_registers(&mut self);
     fn restore_registers(&mut self);
+
+    // Save state handling.
+    fn save_state(&mut self);
 }
