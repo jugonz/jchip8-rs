@@ -1,10 +1,10 @@
 pub trait InstructionSet {
-    // Graphics controls
+    // Graphics controls.
     fn clear_screen(&mut self);
     fn draw_sprite(&mut self);
     fn set_index_reg_to_sprite(&mut self);
 
-    // Control flow
+    // Control flow.
     fn call(&mut self);
     fn r#return(&mut self);
     fn jump(&mut self);
@@ -16,7 +16,7 @@ pub trait InstructionSet {
     fn skip_if_key_pressed(&mut self);
     fn skip_if_key_not_pressed(&mut self);
 
-    // Manipulating data registers
+    // Manipulating data registers.
     fn set_reg_to_literal(&mut self);
     fn set_reg_to_reg(&mut self);
 

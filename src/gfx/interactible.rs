@@ -1,3 +1,5 @@
+use super::Screen;
+
 pub enum SetKeysResult {
     ShouldContinue,
     ShouldExit,
@@ -5,7 +7,9 @@ pub enum SetKeysResult {
 }
 
 pub trait Interactible {
-    fn set_keys(&mut self) -> SetKeysResult;
+    fn update_display(&mut self, screen: &Screen);
+
+    fn set_keys(&mut self, screen: &Screen) -> SetKeysResult;
     fn get_keys(&self) -> &[bool]; // true if pressed, false otherwise
     fn key_is_pressed(&self, key: u8) -> bool; // true if pressed
 }

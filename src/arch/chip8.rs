@@ -1,5 +1,5 @@
 use crate::arch::{Emulator, InstructionSet, Opcode};
-use crate::gfx::{Drawable, Hardware, Interactible, SetKeysResult};
+use crate::gfx::{Drawable, Hardware, Interactible, Screen, SetKeysResult};
 use serde::{Serialize, Deserialize};
 use serde_with::serde_as;
 use std::io::Write;
@@ -32,6 +32,7 @@ pub struct Chip8 {
     cycle_rate: u64,       // How fast to run one cycle in nanoseconds.
 
     // Interactive components.
+    screen: Screen,
     #[serde(skip)]
     hardware: Hardware, // Interactible and Drawable.
     #[serde_as(as = "[_; 80]")] // We could skip serializing this but there is no default.
@@ -52,7 +53,7 @@ pub struct Chip8 {
 
 impl InstructionSet for Chip8 {
     fn clear_screen(&mut self) {
-        self.hardware.clear_screen();
+        self.screen.clear_all_pixels();
         self.draw_flag = true;
     }
 
@@ -75,13 +76,13 @@ impl InstructionSet for Chip8 {
 
                 // If we need to draw this pixel...
                 if (pixel & (shift_constant >> x_line)) > 0
-                    && self.hardware.in_bounds(u32::from(x), u32::from(y))
+                    && self.screen.in_bounds(u32::from(x), u32::from(y))
                 {
                     // XOR the pixel, saving whether we set it here.
-                    if self.hardware.get_pixel(x, y) {
+                    if self.screen.get_pixel(x, y) {
                         self.registers[0xF] = 1;
                     }
-                    self.hardware.xor_pixel(x, y);
+                    self.screen.xor_pixel(x, y);
                 }
             }
         }
@@ -366,6 +367,8 @@ impl std::fmt::Display for Chip8 {
 
 impl Default for Chip8 {
     fn default() -> Chip8 {
+        let screen = Screen::new(640, 480, 64, 32);
+        let hardware = Hardware::new(&screen, false, String::from(NO_GAME_LOADED));
         let mut c8 = Chip8 {
             opcode: Opcode::default(), // will be replaced
 
@@ -379,7 +382,8 @@ impl Default for Chip8 {
             sp: 0,
             update_pc_cycles: 0,
 
-            hardware: Hardware::new(640, 480, 64, 32, false, String::from(NO_GAME_LOADED)),
+            screen,
+            hardware,
             fontset: [
                 0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
                 0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -419,8 +423,10 @@ impl Default for Chip8 {
 
 impl Chip8 {
     pub fn new_with_state_path(debug: bool, save_state_path: Option<String>) -> Chip8 {
+        let screen = Screen::new(640, 480, 64, 32);
+        let hardware = Hardware::new(&screen, debug, String::from(DEFAULT_TITLE));
         Chip8 {
-            hardware: Hardware::new(640, 480, 64, 32, debug, String::from(DEFAULT_TITLE)),
+            hardware,
             debug,
             save_state_path,
             ..Default::default()
@@ -438,7 +444,7 @@ impl Chip8 {
             Ok(mut c8) => {
                 c8.save_state_path = save_state_path;
                 println!("Loaded state is: {c8}");
-                c8.hardware.draw();
+                c8.hardware.update_display(&c8.screen);
                 Ok(c8)
             }
             Err(error) => Err(std::io::Error::other(error)),
@@ -543,7 +549,7 @@ impl Chip8 {
 
     fn draw_screen(&mut self) {
         if self.draw_flag {
-            self.hardware.draw();
+            self.hardware.update_display(&self.screen);
             self.draw_flag = false;
         }
     }
@@ -574,7 +580,7 @@ impl Chip8 {
 
         self.decode_execute();
         self.draw_screen();
-        match self.hardware.set_keys() {
+        match self.hardware.set_keys(&self.screen) {
             SetKeysResult::ShouldSaveState => self.save_state(),
             SetKeysResult::ShouldExit => return false,
             _ => (),

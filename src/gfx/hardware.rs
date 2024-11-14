@@ -3,9 +3,10 @@ use sdl2::keyboard::Scancode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 
-use super::drawable::Drawable;
+use super::Drawable;
 use super::interactible::SetKeysResult;
 use super::interactible::Interactible;
+use super::screen::Screen;
 
 const KEYBOARD_LAYOUT: [Scancode; 16] = [
     Scancode::Num0,
@@ -31,14 +32,7 @@ const KEY_SAVE_STATE: Scancode = Scancode::S;
 
 pub struct Hardware {
     #[allow(unused)]
-    width: u32,
-    height: u32,
-    res_width: u32,
-    res_height: u32,
-    x_display_scale: u32,
-    y_display_scale: u32,
     debug: bool,
-    pixels: Vec<Vec<bool>>,
     title: String,
     sdl: sdl2::Sdl,
     canvas: sdl2::render::Canvas<sdl2::video::Window>,
@@ -48,25 +42,10 @@ pub struct Hardware {
 
 impl Hardware {
     pub fn new(
-        width: u32,
-        height: u32,
-        res_width: u32,
-        res_height: u32,
+        screen: &Screen,
         debug: bool,
         title: String,
     ) -> Hardware {
-        // Check arguments.
-        if width == 0 || height == 0 || res_width == 0 || res_height == 0 {
-            panic!("Zero screen resolution provided: w{width} h{height} rw{res_width} rh{res_height}");
-        }
-        let x_display_scale = width / res_width;
-        let y_display_scale = height / res_height;
-        if x_display_scale == 0 {
-            panic!("Invalid screen resolution provided: w{width} does not divide into rw{res_width}");
-        } else if y_display_scale == 0 {
-            panic!("Invalid screen resolution provided: h{height} does not divide into rh{res_height}");
-        }
-
         // We allow SDL initialization actions to fail with panics
         // as that likely indicates a problem with SDL setup
         // or misuse here!
@@ -74,19 +53,12 @@ impl Hardware {
         let window = sdl
             .video()
             .unwrap()
-            .window(&title, width, height)
+            .window(&title, screen.width, screen.height)
             .position_centered()
             .build()
             .unwrap();
 
         Hardware {
-            width,
-            height,
-            res_width,
-            res_height,
-            x_display_scale,
-            y_display_scale,
-            pixels: vec![vec![false; res_height as usize]; res_width as usize],
             debug,
             title,
             sdl,
@@ -114,7 +86,7 @@ impl Hardware {
         self.events = Some(self.sdl.event_pump().unwrap());
     }
 
-    pub fn handle_pause(&mut self) -> bool {
+    fn handle_pause(&mut self, screen: &Screen) -> bool {
         // The pause key has been pressed, so we must
         // draw the pause icon on the screen
         // and wait until we either quit or resume.
@@ -122,7 +94,7 @@ impl Hardware {
             println!("Pausing!");
         }
 
-        self.draw_pause();
+        self.draw_pause(screen);
 
         let Some(event_pump) = &mut self.events else {
             // If the event pump is gone, we're already quitting,
@@ -194,7 +166,7 @@ impl Hardware {
         }
 
         // We've unpaused, so it's time to re-draw the screen and resume.
-        self.draw();
+        // self.draw();
         return true;
     }
 
@@ -233,27 +205,58 @@ impl Hardware {
         return true;
     }
 
-    #[cfg(test)]
-    pub fn get_pixels(&self) -> &Vec<Vec<bool>> {
-        return &self.pixels;
-    }
-}
-
-impl Drawable for Hardware {
-    fn draw(&mut self) {
+    fn draw_pause(&mut self, screen: &Screen) {
+        // We want to draw a pause icon in the middle of the screen.
         self.canvas.set_draw_color(Color::RGB(0, 0, 0));
         self.canvas.clear();
 
         self.canvas.set_draw_color(Color::RGB(255, 255, 255));
-        for (xindex, xarr) in self.pixels.iter().enumerate() {
+        let xcoord = (screen.res_width / 2) - (screen.res_width / 12); // Roughly lhs of middle of screen.
+        let ycoord = screen.res_height / 3; // Roughly top of middle of screen.
+        let height = screen.height / 3;
+        // If the coordinate is in bounds, it should be safe to convert to / from 32-bit types.
+        if screen.in_bounds(xcoord, ycoord) {
+            let rect = Rect::new(
+                (xcoord * screen.x_display_scale) as i32,
+                (ycoord * screen.y_display_scale) as i32,
+                screen.x_display_scale,
+                height,
+            );
+            self.canvas.fill_rect(rect).unwrap();
+        }
+
+        let xcoord = (screen.res_width / 2) + (screen.res_width / 12); // Roughly rhs of middle of screen.
+        if screen.in_bounds(xcoord, ycoord) {
+            let rect = Rect::new(
+                (xcoord * screen.x_display_scale) as i32,
+                (ycoord * screen.y_display_scale) as i32,
+                screen.x_display_scale,
+                height, // Same height as other drawn rectangle.
+            );
+            self.canvas.fill_rect(rect).unwrap();
+        }
+
+        self.canvas.present();
+    }
+}
+
+impl Interactible for Hardware {
+    fn update_display(&mut self, screen: &Screen) {
+        self.canvas.set_draw_color(Color::RGB(0, 0, 0));
+        self.canvas.clear();
+
+        self.canvas.set_draw_color(Color::RGB(255, 255, 255));
+
+        let pixels = screen.get_pixels();
+        for (xindex, xarr) in pixels.iter().enumerate() {
             for (yindex, pixel) in xarr.iter().enumerate() {
                 if *pixel {
                     // Since these indices are from our vector,
                     // they should be safe to convert to / from 32-bit types.
-                    let xcoord = ((xindex as u32) * self.x_display_scale) as i32;
-                    let ycoord = ((yindex as u32) * self.y_display_scale) as i32;
+                    let xcoord = ((xindex as u32) * screen.x_display_scale) as i32;
+                    let ycoord = ((yindex as u32) * screen.y_display_scale) as i32;
 
-                    let rect = Rect::new(xcoord, ycoord, self.x_display_scale, self.y_display_scale);
+                    let rect = Rect::new(xcoord, ycoord, screen.x_display_scale, screen.y_display_scale);
                     self.canvas.fill_rect(rect).unwrap();
                 }
             }
@@ -262,61 +265,7 @@ impl Drawable for Hardware {
         self.canvas.present();
     }
 
-    fn draw_pause(&mut self) {
-        // We want to draw a pause icon in the middle of the screen.
-        self.canvas.set_draw_color(Color::RGB(0, 0, 0));
-        self.canvas.clear();
-
-        self.canvas.set_draw_color(Color::RGB(255, 255, 255));
-        let xcoord = (self.res_width / 2) - (self.res_width / 12); // Roughly lhs of middle of screen.
-        let ycoord = self.res_height / 3; // Roughly top of middle of screen.
-        let height = self.height / 3;
-        // If the coordinate is in bounds, it should be safe to convert to / from 32-bit types.
-        if self.in_bounds(xcoord, ycoord) {
-            let rect = Rect::new(
-                (xcoord * self.x_display_scale) as i32,
-                (ycoord * self.y_display_scale) as i32,
-                self.x_display_scale,
-                height,
-            );
-            self.canvas.fill_rect(rect).unwrap();
-        }
-
-        let xcoord = (self.res_width / 2) + (self.res_width / 12); // Roughly rhs of middle of screen.
-        if self.in_bounds(xcoord, ycoord) {
-            let rect = Rect::new(
-                (xcoord * self.x_display_scale) as i32,
-                (ycoord * self.y_display_scale) as i32,
-                self.x_display_scale,
-                height, // Same height as other drawn rectangle.
-            );
-            self.canvas.fill_rect(rect).unwrap();
-        }
-
-        self.canvas.present();
-    }
-
-    fn clear_screen(&mut self) {
-        self.pixels.iter_mut().for_each(|x| x.fill(false));
-    }
-
-    fn xor_pixel(&mut self, x: u16, y: u16) {
-        let x_us = x as usize;
-        let y_us = y as usize;
-        self.pixels[x_us][y_us] = self.pixels[x_us][y_us] != true;
-    }
-
-    fn get_pixel(&self, x: u16, y: u16) -> bool {
-        return self.pixels[x as usize][y as usize];
-    }
-
-    fn in_bounds(&self, x: u32, y: u32) -> bool {
-        return x < self.res_width && y < self.res_height;
-    }
-}
-
-impl Interactible for Hardware {
-    fn set_keys(&mut self) -> SetKeysResult {
+    fn set_keys(&mut self, screen: &Screen) -> SetKeysResult {
         let Some(event_pump) = &mut self.events else {
             // If the event pump is gone, we're already quitting,
             // so don't process any keys this cycle (and exit!).
@@ -376,7 +325,7 @@ impl Interactible for Hardware {
         // (We don't allow saving states while paused, so we'll ignore
         // any key presses above for saving states.)
         if keyboard_state.is_scancode_pressed(KEY_PAUSE) {
-            if !self.handle_pause() {
+            if !self.handle_pause(&screen) {
                 return SetKeysResult::ShouldExit;
             }
         }
@@ -400,6 +349,7 @@ impl Interactible for Hardware {
 
 impl Default for Hardware {
     fn default() -> Hardware {
-        Hardware::new(640, 480, 64, 32, false, String::from(""))
+        let screen = Screen::new(640, 480, 64, 32);
+        Hardware::new(&screen, false, String::from(""))
     }
 }
