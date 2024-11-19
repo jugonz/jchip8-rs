@@ -9,7 +9,7 @@ use clap::Parser;
 struct Args {
     /// Path to the game to load
     #[arg(short, long)]
-    path: String,
+    path: Option<String>,
 
     /// Path of game state to load
     #[arg(short, long)]
@@ -27,14 +27,8 @@ struct Args {
 fn main() -> Result<(), std::io::Error> {
     let args = Args::parse();
 
-    if let Some(load_state) = args.load_state {
-        let mut emulator = chip8::Chip8::from_state(&load_state, args.save_state)?;
-        emulator.run();
-    } else {
-        let mut emulator = chip8::Chip8::new_with_state_path(args.debug, args.save_state);
-        emulator.load_game(args.path)?;
-        emulator.run();
-    }
+    let mut emulator = chip8::Chip8::new(args.debug, args.path, args.load_state, args.save_state)?;
+    emulator.run();
 
     Ok(())
 }

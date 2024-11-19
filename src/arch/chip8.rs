@@ -422,22 +422,19 @@ impl Default for Chip8 {
 }
 
 impl Chip8 {
-    pub fn new_with_state_path(debug: bool, save_state_path: Option<String>) -> Chip8 {
-        let screen = Screen::new(640, 480, 64, 32);
-        let hardware = Hardware::new(&screen, debug, String::from(DEFAULT_TITLE));
-        Chip8 {
-            hardware,
-            debug,
-            save_state_path,
-            ..Default::default()
+    fn load_game(&mut self, file_path: String) -> Result<(), std::io::Error> {
+        self.hardware.set_title(format!("{}: {}", TITLE_PREFIX, file_path.clone()))?; // Handles title errors.
+        self.game_title = file_path.clone();
+
+        let contents: Vec<u8> = fs::read(file_path)?; // Consume file_path and handle all read errors.
+        for (index, value) in contents.iter().enumerate() {
+            self.memory[0x200 + index] = *value;
         }
+
+        Ok(())
     }
 
-    pub fn new(debug: bool) -> Chip8 {
-        Self::new_with_state_path(debug, None)
-    }
-
-    pub fn from_state(file_path: &str, save_state_path: Option<String>) -> Result<Chip8, std::io::Error> {
+    fn from_state(file_path: &str, save_state_path: Option<String>) -> Result<Chip8, std::io::Error> {
         let contents: Vec<u8> = fs::read(file_path)?; // Return errors inline.
         let parsed_c8: Result<Chip8, serde_json::Error> = serde_json::from_slice(&contents);
         match parsed_c8 {
@@ -462,6 +459,40 @@ impl Chip8 {
                 return res;
             }
             Err(error) => { Err(std::io::Error::other(error)) },
+        }
+    }
+
+
+    pub fn new(debug: bool, game_path: Option<String>,
+        load_state_path: Option<String>, save_state_path: Option<String>) -> Result<Chip8, std::io::Error> {
+        if let Some(game) = game_path {
+            let screen = Screen::new(640, 480, 64, 32);
+            let hardware = Hardware::new(&screen, debug, String::from(DEFAULT_TITLE));
+            let mut c8 = Chip8 {
+                hardware,
+                debug,
+                save_state_path,
+                ..Default::default()
+            };
+
+            c8.load_game(game)?;
+            Ok(c8)
+        } else if let Some(state) = load_state_path {
+            Self::from_state(&state, save_state_path)
+        } else {
+            Err(std::io::Error::new(std::io::ErrorKind::NotFound, "No path specified"))
+        }
+
+    }
+
+    #[cfg(test)]
+    pub fn tester(debug: bool) -> Chip8 {
+        let screen = Screen::new(640, 480, 64, 32);
+        let hardware = Hardware::new(&screen, debug, String::from(DEFAULT_TITLE));
+        Chip8 {
+            hardware,
+            debug,
+            ..Default::default()
         }
     }
 
@@ -597,18 +628,6 @@ impl Chip8 {
 }
 
 impl Emulator for Chip8 {
-    fn load_game(&mut self, file_path: String) -> Result<(), std::io::Error> {
-        self.hardware.set_title(format!("{}: {}", TITLE_PREFIX, file_path.clone()))?; // Handles title errors.
-        self.game_title = file_path.clone();
-
-        let contents: Vec<u8> = fs::read(file_path)?; // Consume file_path and handle all read errors.
-        for (index, value) in contents.iter().enumerate() {
-            self.memory[0x200 + index] = *value;
-        }
-
-        Ok(())
-    }
-
     fn run(&mut self) {
         self.fetch_opcode();
         if self.opcode == Opcode::default() {

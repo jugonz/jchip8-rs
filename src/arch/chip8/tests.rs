@@ -7,7 +7,7 @@ fn run_opcode(c8: &mut Chip8, instruction: u16) {
 
 #[test]
 fn setup() {
-    let mut c8 = Chip8::new(true);
+    let mut c8 = Chip8::tester(true);
     assert_eq!(c8.pc, 0x200);
 
     let fontset_clear = c8.fontset.iter().all(|x| *x == 0);
@@ -21,7 +21,7 @@ fn setup() {
 
 #[test]
 fn skip_instruction() {
-    let mut c8 = Chip8::new(true);
+    let mut c8 = Chip8::tester(true);
 
     // First, add the literal (A3) to a register.
     run_opcode(&mut c8, 0x71A3);
@@ -53,7 +53,7 @@ fn skip_instruction() {
 
 #[test]
 fn clear_screen() {
-    let mut c8 = Chip8::new(true);
+    let mut c8 = Chip8::tester(true);
 
     // Draw something to the screen and assert that
     // some pixels were set.
@@ -74,7 +74,7 @@ fn clear_screen() {
 
 #[test]
 fn call_return() {
-    let mut c8 = Chip8::new(true);
+    let mut c8 = Chip8::tester(true);
 
     // Make sure the stack is initially empty.
     assert_eq!(c8.sp, 0);
@@ -101,7 +101,7 @@ fn call_return() {
 
 #[test]
 fn add() {
-    let mut c8 = Chip8::new(true);
+    let mut c8 = Chip8::tester(true);
 
     run_opcode(&mut c8, 0x7212);
     // Test that value is now correct.
@@ -118,7 +118,7 @@ fn add() {
 
 #[test]
 fn add_with_carry() {
-    let mut c8 = Chip8::new(true);
+    let mut c8 = Chip8::tester(true);
 
     // Test adding the max value without overflow.
     run_opcode(&mut c8, 0x73FF); // Add FF to reg 3 (0).
@@ -139,7 +139,7 @@ fn add_with_carry() {
 
 #[test]
 fn sub() {
-    let mut c8 = Chip8::new(true);
+    let mut c8 = Chip8::tester(true);
 
     run_opcode(&mut c8, 0x71A2); // Add A2 to reg 1 (0).
     run_opcode(&mut c8, 0x7203); // Add 03 to reg 2 (0).
@@ -172,7 +172,7 @@ fn sub() {
 
 #[test]
 fn shift() {
-    let mut c8 = Chip8::new(true);
+    let mut c8 = Chip8::tester(true);
 
     run_opcode(&mut c8, 0x7101); // Load register 1 with 1.
     assert_eq!(c8.registers[1], 1);
@@ -191,7 +191,7 @@ fn shift() {
 
 #[test]
 fn save_restore_registers() {
-    let mut c8 = Chip8::new(true);
+    let mut c8 = Chip8::tester(true);
 
     run_opcode(&mut c8, 0x71A1); // Reg 1 has A1.
     run_opcode(&mut c8, 0x7206); // Reg 2 has 06.
