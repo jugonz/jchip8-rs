@@ -1,16 +1,17 @@
-use crate::arch::{Emulator, InstructionSet, Opcode};
+use super::{Emulator, InstructionSet, Opcode};
 use crate::gfx::{Drawable, Interactible, Screen, SetKeysResult};
 #[cfg(test)]
 use crate::gfx::MockHardware;
 #[cfg(not(test))]
 use crate::gfx::Hardware;
+
 use serde::{Serialize, Deserialize};
 use serde_with::serde_as;
-use std::io::Write;
 
-use std::{fs, thread, time};
+use std::io::{Error, ErrorKind, Write};
+use std::{fmt, fs, thread, time};
 
-pub const NO_GAME_LOADED: &str = "No game loaded";
+const NO_GAME_LOADED: &str = "No game loaded";
 const DEFAULT_TITLE: &str = "Chip-8 Emulator";
 const TITLE_PREFIX: &str = "chip8";
 
@@ -340,8 +341,8 @@ impl InstructionSet for Chip8 {
     }
 }
 
-impl std::fmt::Display for Chip8 {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl fmt::Display for Chip8 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f,
             "Opcode: {}, Memory: {:?}, Registers: {:?} Index Reg:{} \
             PC: {} Delay: {} Sound: {}, Stack: {:?}, SP: {}, \
@@ -409,7 +410,7 @@ impl Default for Chip8 {
 }
 
 impl Chip8 {
-    fn load_game(&mut self, file_path: &str) -> Result<(), std::io::Error> {
+    fn load_game(&mut self, file_path: &str) -> Result<(), Error> {
         self.hardware.set_title(&format!("{}: {}", TITLE_PREFIX, file_path))?; // Handles title errors.
         self.game_title = String::from(file_path);
 
@@ -421,7 +422,7 @@ impl Chip8 {
         Ok(())
     }
 
-    fn from_state(file_path: &str, save_state_path: Option<String>) -> Result<Chip8, std::io::Error> {
+    fn from_state(file_path: &str, save_state_path: Option<String>) -> Result<Chip8, Error> {
         let contents: Vec<u8> = fs::read(file_path)?; // Return errors inline.
         let parsed_c8: Result<Chip8, serde_json::Error> = serde_json::from_slice(&contents);
         match parsed_c8 {
@@ -436,11 +437,11 @@ impl Chip8 {
                 c8.hardware.update_display(&c8.screen);
                 Ok(c8)
             }
-            Err(error) => Err(std::io::Error::other(error)),
+            Err(error) => Err(Error::other(error)),
         }
     }
 
-    fn to_state(&mut self, to_file_path: &str) -> Result<(), std::io::Error> {
+    fn to_state(&mut self, to_file_path: &str) -> Result<(), Error> {
         let mut save_file = fs::File::create(to_file_path)?;
         match serde_json::to_vec(self) {
             Ok(serialized_c8) => {
@@ -450,13 +451,13 @@ impl Chip8 {
                 std::thread::sleep(std::time::Duration::from_nanos(1000000000));
                 return res;
             }
-            Err(error) => { Err(std::io::Error::other(error)) },
+            Err(error) => { Err(Error::other(error)) },
         }
     }
 
 
     pub fn new(debug: bool, game_path: Option<String>,
-        load_state_path: Option<String>, save_state_path: Option<String>) -> Result<Chip8, std::io::Error> {
+        load_state_path: Option<String>, save_state_path: Option<String>) -> Result<Chip8, Error> {
         if let Some(game) = game_path {
             // A provided path to a game file *always* overrides a load-state.
             let screen = Screen::default();
@@ -473,7 +474,7 @@ impl Chip8 {
         } else if let Some(state) = load_state_path {
             Self::from_state(&state, save_state_path)
         } else {
-            Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Neither a game nor a load state path was specified."))
+            Err(Error::new(ErrorKind::NotFound, "Neither a game nor a load state path was specified."))
         }
 
     }

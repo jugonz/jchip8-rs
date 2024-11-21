@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[non_exhaustive] // don't allow init of Opcode outside this file
 #[derive(PartialEq)]
 pub struct Opcode {
@@ -23,8 +25,8 @@ impl Opcode {
     }
 }
 
-impl std::fmt::Display for Opcode {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl fmt::Display for Opcode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "Value: 0x{:x} Xreg: {} Yreg: {} Literal: {}",

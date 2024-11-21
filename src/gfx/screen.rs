@@ -1,7 +1,7 @@
+use super::Drawable;
+
 use serde::{Serialize, Deserialize};
 use serde_with::serde_as;
-
-use super::Drawable;
 
 #[serde_as]
 #[derive(Serialize, Deserialize)]

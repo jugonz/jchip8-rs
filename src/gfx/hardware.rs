@@ -1,12 +1,11 @@
+use super::{Drawable, Interactible, Screen, SetKeysResult};
+
+use std::io::Error;
+
 use sdl2::event::Event;
 use sdl2::keyboard::Scancode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
-
-use super::Drawable;
-use super::interactible::SetKeysResult;
-use super::interactible::Interactible;
-use super::screen::Screen;
 
 const KEYBOARD_LAYOUT: [Scancode; 16] = [
     Scancode::Num0,
@@ -31,6 +30,7 @@ const KEY_PAUSE: Scancode = Scancode::P;
 const KEY_SAVE_STATE: Scancode = Scancode::S;
 const NO_GAME_LOADED: &str = "No game loaded";
 
+
 pub struct Hardware {
     debug: bool,
     title: String,
@@ -49,23 +49,27 @@ impl Hardware {
         // We allow SDL initialization actions to fail with panics
         // as that likely indicates a problem with SDL setup
         // or misuse here!
-        let sdl = sdl2::init().unwrap();
+        let sdl = sdl2::init().expect("SDL initialization failed.");
         let window = sdl
             .video()
-            .unwrap()
+            .expect("SDL video initialization failed.")
             .window(&title, screen.width, screen.height)
             .position_centered()
             .build()
-            .unwrap();
+            .unwrap_or_else(|_| panic!("SDL window creation ({} x {}) failed.", screen.width, screen.height));
 
         Hardware {
             debug,
             title: String::from(title),
             sdl,
-            canvas: window.into_canvas().build().unwrap(),
+            canvas: window.into_canvas().build().expect("Canvas initialization failed."),
             events: None,
             keyboard: [false; KEYBOARD_LAYOUT.len()],
         }
+    }
+
+    fn draw_rect(&mut self, rect: Rect) {
+        self.canvas.fill_rect(rect).expect("Failed to draw rectangle!");
     }
 
     fn handle_pause(&mut self, screen: &Screen) -> bool {
@@ -204,7 +208,7 @@ impl Hardware {
                 screen.x_display_scale,
                 height,
             );
-            self.canvas.fill_rect(rect).unwrap();
+            self.draw_rect(rect);
         }
 
         let xcoord = (screen.res_width / 2) + (screen.res_width / 12); // Roughly rhs of middle of screen.
@@ -215,7 +219,7 @@ impl Hardware {
                 screen.x_display_scale,
                 height, // Same height as other drawn rectangle.
             );
-            self.canvas.fill_rect(rect).unwrap();
+            self.draw_rect(rect);
         }
 
         self.canvas.present();
@@ -228,14 +232,14 @@ impl Interactible for Hardware {
         // *inside* of self.sdl inside of the constructor, since it's
         // being moved there - it needs to be referenced elsewhere,
         // like here.
-        self.events = Some(self.sdl.event_pump().unwrap());
+        self.events = Some(self.sdl.event_pump().expect("SDL event pump initialization failed."));
     }
 
-    fn set_title(&mut self, title: &str) -> Result<(), std::io::Error> {
+    fn set_title(&mut self, title: &str) -> Result<(), Error> {
         self.title = String::from(title);
 
         if let Err(err) = self.canvas.window_mut().set_title(&self.title) {
-            Err(std::io::Error::from(err))
+            Err(Error::from(err))
         } else {
             Ok(())
         }
@@ -259,7 +263,7 @@ impl Interactible for Hardware {
                     let ycoord = ((yindex as u32) * screen.y_display_scale) as i32;
 
                     let rect = Rect::new(xcoord, ycoord, screen.x_display_scale, screen.y_display_scale);
-                    self.canvas.fill_rect(rect).unwrap();
+                    self.draw_rect(rect);
                 }
             }
         }

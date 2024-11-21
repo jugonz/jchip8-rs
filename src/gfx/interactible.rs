@@ -1,5 +1,5 @@
-use std::io::Error;
 use super::Screen;
+use std::io::Error;
 
 pub enum SetKeysResult {
     ShouldContinue,
