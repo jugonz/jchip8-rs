@@ -1,6 +1,6 @@
 #![allow(dead_code)]
-use super::interactible::SetKeysResult;
 use super::interactible::Interactible;
+use super::interactible::SetKeysResult;
 use super::screen::Screen;
 
 pub struct MockHardware {
@@ -10,11 +10,7 @@ pub struct MockHardware {
 }
 
 impl MockHardware {
-    pub fn new(
-        _screen: &Screen,
-        debug: bool,
-        title: &str,
-    ) -> MockHardware {
+    pub fn new(_screen: &Screen, debug: bool, title: &str) -> MockHardware {
         MockHardware {
             debug,
             title: String::from(title),

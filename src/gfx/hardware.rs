@@ -30,7 +30,6 @@ const KEY_PAUSE: Scancode = Scancode::P;
 const KEY_SAVE_STATE: Scancode = Scancode::S;
 const NO_GAME_LOADED: &str = "No game loaded";
 
-
 pub struct Hardware {
     debug: bool,
     title: String,
@@ -41,11 +40,7 @@ pub struct Hardware {
 }
 
 impl Hardware {
-    pub fn new(
-        screen: &Screen,
-        debug: bool,
-        title: &str,
-    ) -> Hardware {
+    pub fn new(screen: &Screen, debug: bool, title: &str) -> Hardware {
         // We allow SDL initialization actions to fail with panics
         // as that likely indicates a problem with SDL setup
         // or misuse here!
@@ -56,20 +51,30 @@ impl Hardware {
             .window(&title, screen.width, screen.height)
             .position_centered()
             .build()
-            .unwrap_or_else(|_| panic!("SDL window creation ({} x {}) failed.", screen.width, screen.height));
+            .unwrap_or_else(|_| {
+                panic!(
+                    "SDL window creation ({} x {}) failed.",
+                    screen.width, screen.height
+                )
+            });
 
         Hardware {
             debug,
             title: String::from(title),
             sdl,
-            canvas: window.into_canvas().build().expect("Canvas initialization failed."),
+            canvas: window
+                .into_canvas()
+                .build()
+                .expect("Canvas initialization failed."),
             events: None,
             keyboard: [false; KEYBOARD_LAYOUT.len()],
         }
     }
 
     fn draw_rect(&mut self, rect: Rect) {
-        self.canvas.fill_rect(rect).expect("Failed to draw rectangle!");
+        self.canvas
+            .fill_rect(rect)
+            .expect("Failed to draw rectangle!");
     }
 
     fn handle_pause(&mut self, screen: &Screen) -> bool {
@@ -232,7 +237,11 @@ impl Interactible for Hardware {
         // *inside* of self.sdl inside of the constructor, since it's
         // being moved there - it needs to be referenced elsewhere,
         // like here.
-        self.events = Some(self.sdl.event_pump().expect("SDL event pump initialization failed."));
+        self.events = Some(
+            self.sdl
+                .event_pump()
+                .expect("SDL event pump initialization failed."),
+        );
     }
 
     fn set_title(&mut self, title: &str) -> Result<(), Error> {
@@ -262,7 +271,12 @@ impl Interactible for Hardware {
                     let xcoord = ((xindex as u32) * screen.x_display_scale) as i32;
                     let ycoord = ((yindex as u32) * screen.y_display_scale) as i32;
 
-                    let rect = Rect::new(xcoord, ycoord, screen.x_display_scale, screen.y_display_scale);
+                    let rect = Rect::new(
+                        xcoord,
+                        ycoord,
+                        screen.x_display_scale,
+                        screen.y_display_scale,
+                    );
                     self.draw_rect(rect);
                 }
             }

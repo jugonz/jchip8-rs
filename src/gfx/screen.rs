@@ -2,7 +2,7 @@ use super::Drawable;
 
 use std::fmt;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
 #[serde_as]
@@ -18,22 +18,23 @@ pub struct Screen {
 }
 
 impl Screen {
-    pub fn new(
-        width: u32,
-        height: u32,
-        res_width: u32,
-        res_height: u32,
-    ) -> Screen {
+    pub fn new(width: u32, height: u32, res_width: u32, res_height: u32) -> Screen {
         // Check arguments.
         if width == 0 || height == 0 || res_width == 0 || res_height == 0 {
-            panic!("Zero screen resolution provided: w{width} h{height} rw{res_width} rh{res_height}");
+            panic!(
+                "Zero screen resolution provided: w{width} h{height} rw{res_width} rh{res_height}"
+            );
         }
         let x_display_scale = width / res_width;
         let y_display_scale = height / res_height;
         if x_display_scale == 0 {
-            panic!("Invalid screen resolution provided: w{width} does not divide into rw{res_width}");
+            panic!(
+                "Invalid screen resolution provided: w{width} does not divide into rw{res_width}"
+            );
         } else if y_display_scale == 0 {
-            panic!("Invalid screen resolution provided: h{height} does not divide into rh{res_height}");
+            panic!(
+                "Invalid screen resolution provided: h{height} does not divide into rh{res_height}"
+            );
         }
 
         Screen {
@@ -77,9 +78,16 @@ impl Drawable for Screen {
 
 impl fmt::Display for Screen {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "W: {} H: {} SW: {} SH: {} XS: {} YS: {}",
-            self.width, self.height, self.res_width, self.res_height,
-            self.x_display_scale, self.y_display_scale)
+        write!(
+            f,
+            "W: {} H: {} SW: {} SH: {} XS: {} YS: {}",
+            self.width,
+            self.height,
+            self.res_width,
+            self.res_height,
+            self.x_display_scale,
+            self.y_display_scale
+        )
     }
 }
 

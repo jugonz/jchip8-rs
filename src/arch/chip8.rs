@@ -1,11 +1,11 @@
 use super::{Emulator, InstructionSet, Opcode};
-use crate::gfx::{Drawable, Interactible, Screen, SetKeysResult};
-#[cfg(test)]
-use crate::gfx::MockHardware;
 #[cfg(not(test))]
 use crate::gfx::Hardware;
+#[cfg(test)]
+use crate::gfx::MockHardware;
+use crate::gfx::{Drawable, Interactible, Screen, SetKeysResult};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
 use std::io::{Error, ErrorKind, Write};
@@ -46,7 +46,7 @@ pub struct Chip8 {
     #[serde(skip)]
     hardware: Hw, // Interactible.
     #[serde_as(as = "[_; 80]")] // We could skip serializing this but there is no default.
-    fontset: [u8; 80],  // Essentially hardcoded fonts to draw with.
+    fontset: [u8; 80], // Essentially hardcoded fonts to draw with.
     draw_flag: bool,
 
     #[serde(skip)]
@@ -322,7 +322,9 @@ impl InstructionSet for Chip8 {
         // starting in memory at the location in the index register.
         for (loc, reg) in (usize::from(self.index_reg)..).zip(0..=self.opcode.xreg) {
             if loc >= self.memory.len() {
-                panic!("Cannot save load register {reg} from memory location {loc}: out of bounds!");
+                panic!(
+                    "Cannot save load register {reg} from memory location {loc}: out of bounds!"
+                );
             }
 
             self.registers[reg] = self.memory[loc];
@@ -343,13 +345,26 @@ impl InstructionSet for Chip8 {
 
 impl fmt::Display for Chip8 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,
+        write!(
+            f,
             "Opcode: {}, Memory: {:?}, Registers: {:?} Index Reg: {} \
             PC: {} Delay: {} Sound: {}, Stack: {:?}, SP: {}, \
             UPC: {}, Screen: ({}), DF: {}, Save Path: {:?}, Count: {}",
-            self.opcode, self.memory, self.registers, self.index_reg,
-            self.pc, self.delay_timer, self.sound_timer, self.stack, self.sp,
-            self.update_pc_cycles, self.screen, self.draw_flag, self.save_state_path, self.count)
+            self.opcode,
+            self.memory,
+            self.registers,
+            self.index_reg,
+            self.pc,
+            self.delay_timer,
+            self.sound_timer,
+            self.stack,
+            self.sp,
+            self.update_pc_cycles,
+            self.screen,
+            self.draw_flag,
+            self.save_state_path,
+            self.count
+        )
     }
 }
 
@@ -411,7 +426,8 @@ impl Default for Chip8 {
 
 impl Chip8 {
     fn load_game(&mut self, file_path: &str) -> Result<(), Error> {
-        self.hardware.set_title(&format!("{}: {}", TITLE_PREFIX, file_path))?; // Handles title errors.
+        self.hardware
+            .set_title(&format!("{}: {}", TITLE_PREFIX, file_path))?; // Handles title errors.
         self.game_title = String::from(file_path);
 
         let contents: Vec<u8> = fs::read(file_path)?; // Handles all read errors.
@@ -428,8 +444,9 @@ impl Chip8 {
         match parsed_c8 {
             Ok(mut c8) => {
                 // Update state not settable from default().
-                c8.hardware.set_title(&format!("{}: {}", TITLE_PREFIX, file_path))?; // Handles title errors.
-                // Update state overridden by the user.
+                c8.hardware
+                    .set_title(&format!("{}: {}", TITLE_PREFIX, file_path))?; // Handles title errors.
+                                                                              // Update state overridden by the user.
                 c8.save_state_path = save_state_path;
                 println!("Loaded state is: {c8}");
 
@@ -451,13 +468,16 @@ impl Chip8 {
                 std::thread::sleep(std::time::Duration::from_nanos(1000000000));
                 return res;
             }
-            Err(error) => { Err(Error::other(error)) },
+            Err(error) => Err(Error::other(error)),
         }
     }
 
-
-    pub fn new(debug: bool, game_path: Option<String>,
-        load_state_path: Option<String>, save_state_path: Option<String>) -> Result<Chip8, Error> {
+    pub fn new(
+        debug: bool,
+        game_path: Option<String>,
+        load_state_path: Option<String>,
+        save_state_path: Option<String>,
+    ) -> Result<Chip8, Error> {
         if let Some(game) = game_path {
             // A provided path to a game file *always* overrides a load-state.
             let screen = Screen::default();
@@ -474,9 +494,11 @@ impl Chip8 {
         } else if let Some(state) = load_state_path {
             Self::from_state(&state, save_state_path)
         } else {
-            Err(Error::new(ErrorKind::NotFound, "Neither a game nor a load state path was specified."))
+            Err(Error::new(
+                ErrorKind::NotFound,
+                "Neither a game nor a load state path was specified.",
+            ))
         }
-
     }
 
     #[cfg(test)]

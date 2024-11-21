@@ -7,8 +7,7 @@ mod screen;
 
 pub use drawable::Drawable;
 pub use hardware::Hardware;
+pub use interactible::{Interactible, SetKeysResult};
 #[cfg(test)]
 pub use mockhardware::MockHardware;
-pub use interactible::SetKeysResult;
-pub use interactible::Interactible;
 pub use screen::Screen;
