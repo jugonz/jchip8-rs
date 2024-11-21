@@ -31,7 +31,6 @@ const KEY_PAUSE: Scancode = Scancode::P;
 const KEY_SAVE_STATE: Scancode = Scancode::S;
 
 pub struct Hardware {
-    #[allow(unused)]
     debug: bool,
     title: String,
     sdl: sdl2::Sdl,
@@ -66,24 +65,6 @@ impl Hardware {
             events: None,
             keyboard: [false; 16],
         }
-    }
-
-    pub fn set_title(&mut self, title: String) -> Result<(), std::io::Error> {
-        self.title = title;
-
-        if let Err(err) = self.canvas.window_mut().set_title(&self.title) {
-            Err(std::io::Error::from(err))
-        } else {
-            Ok(())
-        }
-    }
-
-    pub fn init(&mut self) {
-        // This is a singleton - so we cannot reference the event pump
-        // *inside* of self.sdl inside of the constructor, since it's
-        // being moved there - it needs to be referenced elsewhere,
-        // like here.
-        self.events = Some(self.sdl.event_pump().unwrap());
     }
 
     fn handle_pause(&mut self, screen: &Screen) -> bool {
@@ -241,6 +222,24 @@ impl Hardware {
 }
 
 impl Interactible for Hardware {
+    fn init(&mut self) {
+        // This is a singleton - so we cannot reference the event pump
+        // *inside* of self.sdl inside of the constructor, since it's
+        // being moved there - it needs to be referenced elsewhere,
+        // like here.
+        self.events = Some(self.sdl.event_pump().unwrap());
+    }
+
+    fn set_title(&mut self, title: String) -> Result<(), std::io::Error> {
+        self.title = title;
+
+        if let Err(err) = self.canvas.window_mut().set_title(&self.title) {
+            Err(std::io::Error::from(err))
+        } else {
+            Ok(())
+        }
+    }
+
     fn update_display(&mut self, screen: &Screen) {
         self.canvas.set_draw_color(Color::RGB(0, 0, 0));
         self.canvas.clear();

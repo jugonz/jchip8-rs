@@ -1,3 +1,4 @@
+use std::io::Error;
 use super::Screen;
 
 pub enum SetKeysResult {
@@ -7,6 +8,8 @@ pub enum SetKeysResult {
 }
 
 pub trait Interactible {
+    fn init(&mut self);
+    fn set_title(&mut self, title: String) -> Result<(), Error>;
     fn update_display(&mut self, screen: &Screen);
 
     fn set_keys(&mut self, screen: &Screen) -> SetKeysResult;

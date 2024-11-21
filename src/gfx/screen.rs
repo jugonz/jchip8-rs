@@ -73,19 +73,3 @@ impl Drawable for Screen {
         return x < self.res_width && y < self.res_height;
     }
 }
-
-// impl Iterator for Screen {
-//     type Item = (usize, usize);
-
-//     fn next(&mut self) -> Option<(usize, usize)> {
-//         for (xindex, xarr) in self.pixels.iter().enumerate() {
-//             for (yindex, pixel) in xarr.iter().enumerate() {
-//                 if *pixel {
-//                     return Some((xindex, yindex))
-//                 }
-//             }
-//         }
-
-//         None
-//     }
-// }

@@ -1,5 +1,9 @@
 use crate::arch::{Emulator, InstructionSet, Opcode};
-use crate::gfx::{Drawable, Hardware, Interactible, Screen, SetKeysResult};
+use crate::gfx::{Drawable, Interactible, Screen, SetKeysResult};
+#[cfg(test)]
+use crate::gfx::MockHardware;
+#[cfg(not(test))]
+use crate::gfx::Hardware;
 use serde::{Serialize, Deserialize};
 use serde_with::serde_as;
 use std::io::Write;
@@ -12,6 +16,11 @@ const TITLE_PREFIX: &str = "chip8";
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+type Hw = MockHardware;
+#[cfg(not(test))]
+type Hw = Hardware;
 
 #[serde_as]
 #[derive(Serialize, Deserialize)]
@@ -34,7 +43,7 @@ pub struct Chip8 {
     // Interactive components.
     screen: Screen,
     #[serde(skip)]
-    hardware: Hardware, // Interactible and Drawable.
+    hardware: Hw, // Interactible.
     #[serde_as(as = "[_; 80]")] // We could skip serializing this but there is no default.
     fontset: [u8; 80],  // Essentially hardcoded fonts to draw with.
     draw_flag: bool,
@@ -331,28 +340,6 @@ impl InstructionSet for Chip8 {
     }
 }
 
-// impl Serialize for Chip8 {
-
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: Serializer
-//     {
-//         let mut state = serializer.serialize_struct("Chip8", 4)?;
-//         // MEMORY
-//         state.serialize_seq("mm", &self.memory)?;
-//         // REGISTERS
-//         state.serialize_field("ir", &self.index_reg)?;
-//         state.serialize_field("pc", &self.pc)?;
-//         state.serialize_field("dt", &self.delay_timer)?;
-//         state.serialize_field("st", &self.sound_timer)?;
-//         // STACK
-//         state.serialize_field("sp", &self.sp)?;
-//         state.serialize_field("df", &self.draw_flag)?;
-
-//         state.end()
-//     }
-// }
-
 impl std::fmt::Display for Chip8 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f,
@@ -368,7 +355,7 @@ impl std::fmt::Display for Chip8 {
 impl Default for Chip8 {
     fn default() -> Chip8 {
         let screen = Screen::new(640, 480, 64, 32);
-        let hardware = Hardware::new(&screen, false, String::from(NO_GAME_LOADED));
+        let hardware = Hw::new(&screen, false, String::from(NO_GAME_LOADED));
         let mut c8 = Chip8 {
             opcode: Opcode::default(), // will be replaced
 
@@ -467,7 +454,7 @@ impl Chip8 {
         load_state_path: Option<String>, save_state_path: Option<String>) -> Result<Chip8, std::io::Error> {
         if let Some(game) = game_path {
             let screen = Screen::new(640, 480, 64, 32);
-            let hardware = Hardware::new(&screen, debug, String::from(DEFAULT_TITLE));
+            let hardware = Hw::new(&screen, debug, String::from(DEFAULT_TITLE));
             let mut c8 = Chip8 {
                 hardware,
                 debug,
@@ -488,7 +475,7 @@ impl Chip8 {
     #[cfg(test)]
     pub fn tester(debug: bool) -> Chip8 {
         let screen = Screen::new(640, 480, 64, 32);
-        let hardware = Hardware::new(&screen, debug, String::from(DEFAULT_TITLE));
+        let hardware = Hw::new(&screen, debug, String::from(DEFAULT_TITLE));
         Chip8 {
             hardware,
             debug,
