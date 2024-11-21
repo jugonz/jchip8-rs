@@ -44,7 +44,7 @@ impl Hardware {
     pub fn new(
         screen: &Screen,
         debug: bool,
-        title: String,
+        title: &str,
     ) -> Hardware {
         // We allow SDL initialization actions to fail with panics
         // as that likely indicates a problem with SDL setup
@@ -60,7 +60,7 @@ impl Hardware {
 
         Hardware {
             debug,
-            title,
+            title: String::from(title),
             sdl,
             canvas: window.into_canvas().build().unwrap(),
             events: None,
@@ -231,8 +231,8 @@ impl Interactible for Hardware {
         self.events = Some(self.sdl.event_pump().unwrap());
     }
 
-    fn set_title(&mut self, title: String) -> Result<(), std::io::Error> {
-        self.title = title;
+    fn set_title(&mut self, title: &str) -> Result<(), std::io::Error> {
+        self.title = String::from(title);
 
         if let Err(err) = self.canvas.window_mut().set_title(&self.title) {
             Err(std::io::Error::from(err))
@@ -352,6 +352,6 @@ impl Interactible for Hardware {
 impl Default for Hardware {
     fn default() -> Hardware {
         let screen = Screen::default();
-        Hardware::new(&screen, false, String::from(NO_GAME_LOADED))
+        Hardware::new(&screen, false, NO_GAME_LOADED)
     }
 }

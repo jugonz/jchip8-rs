@@ -355,7 +355,7 @@ impl std::fmt::Display for Chip8 {
 impl Default for Chip8 {
     fn default() -> Chip8 {
         let screen = Screen::default();
-        let hardware = Hw::new(&screen, false, String::from(NO_GAME_LOADED));
+        let hardware = Hw::new(&screen, false, NO_GAME_LOADED);
         let mut c8 = Chip8 {
             opcode: Opcode::default(), // Will be replaced at fetch_opcode() time.
 
@@ -409,11 +409,11 @@ impl Default for Chip8 {
 }
 
 impl Chip8 {
-    fn load_game(&mut self, file_path: String) -> Result<(), std::io::Error> {
-        self.hardware.set_title(format!("{}: {}", TITLE_PREFIX, file_path.clone()))?; // Handles title errors.
-        self.game_title = file_path.clone();
+    fn load_game(&mut self, file_path: &str) -> Result<(), std::io::Error> {
+        self.hardware.set_title(&format!("{}: {}", TITLE_PREFIX, file_path))?; // Handles title errors.
+        self.game_title = String::from(file_path);
 
-        let contents: Vec<u8> = fs::read(file_path)?; // Consume file_path and handle all read errors.
+        let contents: Vec<u8> = fs::read(file_path)?; // Handles all read errors.
         for (index, value) in contents.iter().enumerate() {
             self.memory[0x200 + index] = *value; // Essentially memcpy().
         }
@@ -427,7 +427,7 @@ impl Chip8 {
         match parsed_c8 {
             Ok(mut c8) => {
                 // Update state not settable from default().
-                c8.hardware.set_title(format!("{}: {}", TITLE_PREFIX, file_path))?; // Handles title errors.
+                c8.hardware.set_title(&format!("{}: {}", TITLE_PREFIX, file_path))?; // Handles title errors.
                 // Update state overridden by the user.
                 c8.save_state_path = save_state_path;
                 println!("Loaded state is: {c8}");
@@ -460,7 +460,7 @@ impl Chip8 {
         if let Some(game) = game_path {
             // A provided path to a game file *always* overrides a load-state.
             let screen = Screen::default();
-            let hardware = Hw::new(&screen, debug, String::from(DEFAULT_TITLE));
+            let hardware = Hw::new(&screen, debug, DEFAULT_TITLE);
             let mut c8 = Chip8 {
                 hardware,
                 debug,
@@ -468,7 +468,7 @@ impl Chip8 {
                 ..Default::default()
             };
 
-            c8.load_game(game)?;
+            c8.load_game(&game)?;
             Ok(c8)
         } else if let Some(state) = load_state_path {
             Self::from_state(&state, save_state_path)
@@ -482,7 +482,7 @@ impl Chip8 {
     pub fn tester(debug: bool) -> Chip8 {
         // Why not Hw::default()? Only really to pass debug.
         let screen = Screen::default();
-        let hardware = Hw::new(&screen, debug, String::from(DEFAULT_TITLE));
+        let hardware = Hw::new(&screen, debug, DEFAULT_TITLE);
         Chip8 {
             hardware,
             debug,

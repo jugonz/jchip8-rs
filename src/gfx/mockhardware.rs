@@ -13,11 +13,11 @@ impl MockHardware {
     pub fn new(
         _screen: &Screen,
         debug: bool,
-        title: String,
+        title: &str,
     ) -> MockHardware {
         MockHardware {
             debug,
-            title,
+            title: String::from(title),
             keyboard: [false; 1],
         }
     }
@@ -26,8 +26,8 @@ impl MockHardware {
 impl Interactible for MockHardware {
     fn init(&mut self) {}
 
-    fn set_title(&mut self, title: String) -> Result<(), std::io::Error> {
-        self.title = title;
+    fn set_title(&mut self, title: &str) -> Result<(), std::io::Error> {
+        self.title = String::from(title);
         Ok(())
     }
 
@@ -49,6 +49,6 @@ impl Interactible for MockHardware {
 impl Default for MockHardware {
     fn default() -> MockHardware {
         let screen = Screen::default();
-        MockHardware::new(&screen, false, String::from(""))
+        MockHardware::new(&screen, false, "")
     }
 }
