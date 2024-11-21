@@ -6,7 +6,7 @@ use super::screen::Screen;
 pub struct MockHardware {
     debug: bool,
     title: String,
-    keyboard: [bool; 16], // True if a key is pressed.
+    keyboard: [bool; 1], // True if a key is pressed.
 }
 
 impl MockHardware {
@@ -18,11 +18,9 @@ impl MockHardware {
         MockHardware {
             debug,
             title,
-            keyboard: [false; 16],
+            keyboard: [false; 1],
         }
     }
-
-    pub fn init(&mut self) {}
 }
 
 impl Interactible for MockHardware {
@@ -30,7 +28,6 @@ impl Interactible for MockHardware {
 
     fn set_title(&mut self, title: String) -> Result<(), std::io::Error> {
         self.title = title;
-
         Ok(())
     }
 
@@ -41,17 +38,17 @@ impl Interactible for MockHardware {
     }
 
     fn get_keys(&self) -> &[bool] {
-        return &self.keyboard;
+        &self.keyboard
     }
 
     fn key_is_pressed(&self, _key: u8) -> bool {
-        return false;
+        false
     }
 }
 
 impl Default for MockHardware {
     fn default() -> MockHardware {
-        let screen = Screen::new(640, 480, 64, 32);
+        let screen = Screen::default();
         MockHardware::new(&screen, false, String::from(""))
     }
 }

@@ -5,7 +5,6 @@ use super::Drawable;
 
 #[serde_as]
 #[derive(Serialize, Deserialize)]
-#[derive(Default)]
 pub struct Screen {
     pub width: u32,
     pub height: u32,
@@ -61,15 +60,21 @@ impl Drawable for Screen {
 
     // Getters
     fn get_pixel(&self, x: u16, y: u16) -> bool {
-        return self.pixels[x as usize][y as usize];
+        self.pixels[x as usize][y as usize]
     }
 
     fn get_pixels(&self) -> &Vec<Vec<bool>> {
-        return &self.pixels;
+        &self.pixels
     }
 
     // Info
     fn in_bounds(&self, x: u32, y: u32) -> bool {
-        return x < self.res_width && y < self.res_height;
+        x < self.res_width && y < self.res_height
+    }
+}
+
+impl Default for Screen {
+    fn default() -> Screen {
+        Screen::new(640, 480, 64, 32)
     }
 }

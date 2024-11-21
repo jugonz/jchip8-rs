@@ -29,6 +29,7 @@ const KEYBOARD_LAYOUT: [Scancode; 16] = [
 const KEY_QUIT: Scancode = Scancode::Escape;
 const KEY_PAUSE: Scancode = Scancode::P;
 const KEY_SAVE_STATE: Scancode = Scancode::S;
+const NO_GAME_LOADED: &str = "No game loaded";
 
 pub struct Hardware {
     debug: bool,
@@ -63,7 +64,7 @@ impl Hardware {
             sdl,
             canvas: window.into_canvas().build().unwrap(),
             events: None,
-            keyboard: [false; 16],
+            keyboard: [false; KEYBOARD_LAYOUT.len()],
         }
     }
 
@@ -147,8 +148,8 @@ impl Hardware {
         }
 
         // We've unpaused, so it's time to re-draw the screen and resume.
-        // self.draw();
-        return true;
+        self.update_display(&screen);
+        true
     }
 
     pub fn handle_quit(&mut self) -> bool {
@@ -183,15 +184,15 @@ impl Hardware {
         }
 
         // We're not quitting.
-        return true;
+        true
     }
 
     fn draw_pause(&mut self, screen: &Screen) {
         // We want to draw a pause icon in the middle of the screen.
-        self.canvas.set_draw_color(Color::RGB(0, 0, 0));
+        self.canvas.set_draw_color(Color::BLACK);
         self.canvas.clear();
 
-        self.canvas.set_draw_color(Color::RGB(255, 255, 255));
+        self.canvas.set_draw_color(Color::WHITE);
         let xcoord = (screen.res_width / 2) - (screen.res_width / 12); // Roughly lhs of middle of screen.
         let ycoord = screen.res_height / 3; // Roughly top of middle of screen.
         let height = screen.height / 3;
@@ -241,10 +242,12 @@ impl Interactible for Hardware {
     }
 
     fn update_display(&mut self, screen: &Screen) {
-        self.canvas.set_draw_color(Color::RGB(0, 0, 0));
+        // First, re-draw the entire canvas with black.
+        self.canvas.set_draw_color(Color::BLACK);
         self.canvas.clear();
 
-        self.canvas.set_draw_color(Color::RGB(255, 255, 255));
+        // Next, draw the set pixels with white.
+        self.canvas.set_draw_color(Color::WHITE);
 
         let pixels = screen.get_pixels();
         for (xindex, xarr) in pixels.iter().enumerate() {
@@ -316,17 +319,17 @@ impl Interactible for Hardware {
         // If so, we'll return to our caller that it was pressed
         // *only* if we're not pausing or quitting.
         if keyboard_state.is_scancode_pressed(KEY_SAVE_STATE) {
-            println!("Saving state!");
+            if self.debug {
+                println!("Saving state!");
+            }
             caller_action = SetKeysResult::ShouldSaveState;
         }
 
         // Check if we need to pause (and if so, if we quit during the pause).
         // (We don't allow saving states while paused, so we'll ignore
         // any key presses above for saving states.)
-        if keyboard_state.is_scancode_pressed(KEY_PAUSE) {
-            if !self.handle_pause(&screen) {
-                return SetKeysResult::ShouldExit;
-            }
+        if keyboard_state.is_scancode_pressed(KEY_PAUSE) && !self.handle_pause(&screen) {
+            return SetKeysResult::ShouldExit;
         }
 
         // Check if we need to quit - if not,
@@ -338,17 +341,17 @@ impl Interactible for Hardware {
     }
 
     fn get_keys(&self) -> &[bool] {
-        return &self.keyboard;
+        &self.keyboard
     }
 
     fn key_is_pressed(&self, key: u8) -> bool {
-        return self.keyboard[key as usize];
+        self.keyboard[key as usize]
     }
 }
 
 impl Default for Hardware {
     fn default() -> Hardware {
-        let screen = Screen::new(640, 480, 64, 32);
-        Hardware::new(&screen, false, String::from(""))
+        let screen = Screen::default();
+        Hardware::new(&screen, false, String::from(NO_GAME_LOADED))
     }
 }

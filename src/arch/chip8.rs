@@ -10,7 +10,7 @@ use std::io::Write;
 
 use std::{fs, thread, time};
 
-const NO_GAME_LOADED: &str = "No game loaded";
+pub const NO_GAME_LOADED: &str = "No game loaded";
 const DEFAULT_TITLE: &str = "Chip-8 Emulator";
 const TITLE_PREFIX: &str = "chip8";
 
@@ -333,7 +333,7 @@ impl InstructionSet for Chip8 {
         if let Some(path) = self.save_state_path.clone() {
             if let Err(error) = self.to_state(&path) {
                 if self.debug {
-                    println!("Saving state failed: {error}");
+                    println!("Failed to save state: {error}");
                 }
             }
         }
@@ -354,13 +354,13 @@ impl std::fmt::Display for Chip8 {
 
 impl Default for Chip8 {
     fn default() -> Chip8 {
-        let screen = Screen::new(640, 480, 64, 32);
+        let screen = Screen::default();
         let hardware = Hw::new(&screen, false, String::from(NO_GAME_LOADED));
         let mut c8 = Chip8 {
-            opcode: Opcode::default(), // will be replaced
+            opcode: Opcode::default(), // Will be replaced at fetch_opcode() time.
 
             memory: [0; 4096],
-            registers: [0; 16], // this is an emulator, we use wrapping arithmetic
+            registers: [0; 16], // We use wrapping arithmetic.
             index_reg: 0,
             pc: 0x200, // Starting PC is static.
             delay_timer: 0,
@@ -390,7 +390,7 @@ impl Default for Chip8 {
                 0xF0, 0x80, 0xF0, 0x80, 0x80, // F
             ],
             draw_flag: false,
-            cycle_rate: 1666667, // 60hz
+            cycle_rate: 1666667, // ~60hz
 
             game_title: String::from(NO_GAME_LOADED),
             save_state_path: None,
@@ -415,7 +415,7 @@ impl Chip8 {
 
         let contents: Vec<u8> = fs::read(file_path)?; // Consume file_path and handle all read errors.
         for (index, value) in contents.iter().enumerate() {
-            self.memory[0x200 + index] = *value;
+            self.memory[0x200 + index] = *value; // Essentially memcpy().
         }
 
         Ok(())
@@ -426,8 +426,13 @@ impl Chip8 {
         let parsed_c8: Result<Chip8, serde_json::Error> = serde_json::from_slice(&contents);
         match parsed_c8 {
             Ok(mut c8) => {
+                // Update state not settable from default().
+                c8.hardware.set_title(format!("{}: {}", TITLE_PREFIX, file_path))?; // Handles title errors.
+                // Update state overridden by the user.
                 c8.save_state_path = save_state_path;
                 println!("Loaded state is: {c8}");
+
+                // Draw the screen once to start.
                 c8.hardware.update_display(&c8.screen);
                 Ok(c8)
             }
@@ -453,7 +458,8 @@ impl Chip8 {
     pub fn new(debug: bool, game_path: Option<String>,
         load_state_path: Option<String>, save_state_path: Option<String>) -> Result<Chip8, std::io::Error> {
         if let Some(game) = game_path {
-            let screen = Screen::new(640, 480, 64, 32);
+            // A provided path to a game file *always* overrides a load-state.
+            let screen = Screen::default();
             let hardware = Hw::new(&screen, debug, String::from(DEFAULT_TITLE));
             let mut c8 = Chip8 {
                 hardware,
@@ -467,14 +473,15 @@ impl Chip8 {
         } else if let Some(state) = load_state_path {
             Self::from_state(&state, save_state_path)
         } else {
-            Err(std::io::Error::new(std::io::ErrorKind::NotFound, "No path specified"))
+            Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Neither a game nor a load state path was specified."))
         }
 
     }
 
     #[cfg(test)]
     pub fn tester(debug: bool) -> Chip8 {
-        let screen = Screen::new(640, 480, 64, 32);
+        // Why not Hw::default()? Only really to pass debug.
+        let screen = Screen::default();
         let hardware = Hw::new(&screen, debug, String::from(DEFAULT_TITLE));
         Chip8 {
             hardware,
@@ -606,7 +613,8 @@ impl Chip8 {
         self.update_timers();
         self.increment_pc();
 
-        return true;
+        // Continue to the next cycle.
+        true
     }
 
     fn unknown_instruction(&self) {
