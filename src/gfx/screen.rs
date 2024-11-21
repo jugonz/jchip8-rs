@@ -1,5 +1,7 @@
 use super::Drawable;
 
+use std::fmt;
+
 use serde::{Serialize, Deserialize};
 use serde_with::serde_as;
 
@@ -73,8 +75,17 @@ impl Drawable for Screen {
     }
 }
 
+impl fmt::Display for Screen {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "W: {} H: {} SW: {} SH: {} XS: {} YS: {}",
+            self.width, self.height, self.res_width, self.res_height,
+            self.x_display_scale, self.y_display_scale)
+    }
+}
+
 impl Default for Screen {
     fn default() -> Screen {
+        // For now, our default window size.
         Screen::new(640, 480, 64, 32)
     }
 }

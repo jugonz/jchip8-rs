@@ -344,12 +344,12 @@ impl InstructionSet for Chip8 {
 impl fmt::Display for Chip8 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f,
-            "Opcode: {}, Memory: {:?}, Registers: {:?} Index Reg:{} \
+            "Opcode: {}, Memory: {:?}, Registers: {:?} Index Reg: {} \
             PC: {} Delay: {} Sound: {}, Stack: {:?}, SP: {}, \
-            UPC: {}, DF: {}, Save Path: {:?}, Count: {}",
+            UPC: {}, Screen: ({}), DF: {}, Save Path: {:?}, Count: {}",
             self.opcode, self.memory, self.registers, self.index_reg,
             self.pc, self.delay_timer, self.sound_timer, self.stack, self.sp,
-            self.update_pc_cycles, self.draw_flag, self.save_state_path, self.count)
+            self.update_pc_cycles, self.screen, self.draw_flag, self.save_state_path, self.count)
     }
 }
 
