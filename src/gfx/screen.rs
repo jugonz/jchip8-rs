@@ -33,7 +33,6 @@ impl Iterator for ScreenIterator<'_> {
             // Iterate all Y values, even those we've already seen in the current X vector
             // (we do this to keep updating our saved Y simple).
             for (yindex, pixel) in xarr.iter().enumerate() {
-
                 // Since we sliced above, xindex is the start from the slice, not the entire vector.
                 let real_xindex = xindex + self.curr.0;
                 if *pixel && ((xindex > 0) || (xindex == 0 && yindex > self.curr.1)) {
@@ -44,7 +43,6 @@ impl Iterator for ScreenIterator<'_> {
                     return Some(self.curr);
                 }
             }
-
         }
 
         None
@@ -58,7 +56,10 @@ impl<'a> IntoIterator for &'a Screen {
     type IntoIter = ScreenIterator<'a>;
 
     fn into_iter(self) -> ScreenIterator<'a> {
-        ScreenIterator { screen: self, curr: (0, 0) }
+        ScreenIterator {
+            screen: self,
+            curr: (0, 0),
+        }
     }
 }
 

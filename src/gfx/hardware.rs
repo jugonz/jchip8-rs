@@ -274,7 +274,6 @@ impl Interactible for Hardware {
                 screen.y_display_scale,
             );
             self.draw_rect(rect);
-
         }
 
         self.canvas.present();
