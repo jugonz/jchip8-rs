@@ -10,4 +10,4 @@ pub use hardware::Hardware;
 pub use interactible::{Interactible, SetKeysResult};
 #[cfg(test)]
 pub use mockhardware::MockHardware;
-pub use screen::Screen;
+pub use screen::{Screen, ScreenIterator};

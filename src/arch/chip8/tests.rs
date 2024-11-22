@@ -58,18 +58,15 @@ fn clear_screen() {
     // Draw something to the screen and assert that
     // some pixels were set.
     run_opcode(&mut c8, 0xD324);
-    let pixels = c8.screen.get_pixels();
+    let pixels_count = c8.screen.into_iter().count();
 
     // If all pixels are false, clear is true.
-    let clear = pixels.iter().all(|x| x.iter().all(|&y| !y));
-    assert_eq!(clear, false, "DrawSprite failed to draw the screen!");
+    assert_ne!(pixels_count, 0, "DrawSprite failed to draw the screen!");
 
     // Now, clear the screen, and check that it is empty.
     run_opcode(&mut c8, 0x00E0);
-    let pixels = c8.screen.get_pixels();
-
-    let clear = pixels.iter().all(|x| x.iter().all(|&y| !y));
-    assert_eq!(clear, true, "ClearScreen failed to clear the screen!");
+    let pixels_count = c8.screen.into_iter().count();
+    assert_eq!(pixels_count, 0, "ClearScreen failed to clear the screen!");
 }
 
 #[test]

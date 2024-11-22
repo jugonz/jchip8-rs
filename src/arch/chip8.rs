@@ -85,6 +85,7 @@ impl InstructionSet for Chip8 {
                 let y = y_coord + y_line;
 
                 // If we need to draw this pixel...
+                // (hedging against illegal code in the emulated program)
                 if (pixel & (shift_constant >> x_line)) > 0
                     && self.screen.in_bounds(u32::from(x), u32::from(y))
                 {

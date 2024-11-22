@@ -17,6 +17,51 @@ pub struct Screen {
     pixels: Vec<Vec<bool>>,
 }
 
+// Iterator for a Screen that only returns pixels that are set.
+pub struct ScreenIterator<'a> {
+    screen: &'a Screen,
+    // Keep track of the last (X, Y) pixel we saw that was set.
+    curr: (usize, usize),
+}
+
+impl Iterator for ScreenIterator<'_> {
+    type Item = (usize, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Iterate only the vectors starting with our current X coordinate.
+        for (xindex, xarr) in self.screen.pixels[self.curr.0..].iter().enumerate() {
+            // Iterate all Y values, even those we've already seen in the current X vector
+            // (we do this to keep updating our saved Y simple).
+            for (yindex, pixel) in xarr.iter().enumerate() {
+
+                // Since we sliced above, xindex is the start from the slice, not the entire vector.
+                let real_xindex = xindex + self.curr.0;
+                if *pixel && ((xindex > 0) || (xindex == 0 && yindex > self.curr.1)) {
+                    // If we see a pixel past the last Y we saw in the first vector,
+                    // or a pixel in *ANY* vector past the first, it's new. Save it and return it.
+                    self.curr = (real_xindex, yindex);
+                    // println!("Setting curr to ({real_xindex}, {yindex})");
+                    return Some(self.curr);
+                }
+            }
+
+        }
+
+        None
+    }
+}
+
+// Allow converting references of Screens to iterators
+// for easy for loop iteration (but without consuming the Screen object itself).
+impl<'a> IntoIterator for &'a Screen {
+    type Item = (usize, usize);
+    type IntoIter = ScreenIterator<'a>;
+
+    fn into_iter(self) -> ScreenIterator<'a> {
+        ScreenIterator { screen: self, curr: (0, 0) }
+    }
+}
+
 impl Screen {
     pub fn new(width: u32, height: u32, res_width: u32, res_height: u32) -> Screen {
         // Check arguments.
@@ -47,6 +92,9 @@ impl Screen {
             pixels: vec![vec![false; res_height as usize]; res_width as usize],
         }
     }
+
+    // We could also implement iter() here,
+    // but the for loop syntax suffices currently.
 }
 
 impl Drawable for Screen {
@@ -64,10 +112,6 @@ impl Drawable for Screen {
     // Getters
     fn get_pixel(&self, x: u16, y: u16) -> bool {
         self.pixels[x as usize][y as usize]
-    }
-
-    fn get_pixels(&self) -> &Vec<Vec<bool>> {
-        &self.pixels
     }
 
     // Info

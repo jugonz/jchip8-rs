@@ -262,24 +262,19 @@ impl Interactible for Hardware {
         // Next, draw the set pixels with white.
         self.canvas.set_draw_color(Color::WHITE);
 
-        let pixels = screen.get_pixels();
-        for (xindex, xarr) in pixels.iter().enumerate() {
-            for (yindex, pixel) in xarr.iter().enumerate() {
-                if *pixel {
-                    // Since these indices are from our vector,
-                    // they should be safe to convert to / from 32-bit types.
-                    let xcoord = ((xindex as u32) * screen.x_display_scale) as i32;
-                    let ycoord = ((yindex as u32) * screen.y_display_scale) as i32;
+        for (setx, sety) in screen {
+            // println!("Found pixel ({setx}, {sety}) set!");
+            let xcoord = ((setx as u32) * screen.x_display_scale) as i32;
+            let ycoord = ((sety as u32) * screen.y_display_scale) as i32;
 
-                    let rect = Rect::new(
-                        xcoord,
-                        ycoord,
-                        screen.x_display_scale,
-                        screen.y_display_scale,
-                    );
-                    self.draw_rect(rect);
-                }
-            }
+            let rect = Rect::new(
+                xcoord,
+                ycoord,
+                screen.x_display_scale,
+                screen.y_display_scale,
+            );
+            self.draw_rect(rect);
+
         }
 
         self.canvas.present();
