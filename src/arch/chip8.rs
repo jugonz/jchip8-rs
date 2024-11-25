@@ -6,6 +6,7 @@ use crate::gfx::MockHardware;
 use crate::gfx::{Drawable, Interactible, Screen, SetKeysResult};
 
 use serde::{Deserialize, Serialize};
+use serde_json::error::Category;
 use serde_with::serde_as;
 
 use std::io::{Error, ErrorKind, Write};
@@ -14,6 +15,8 @@ use std::{fmt, fs, thread, time};
 const NO_GAME_LOADED: &str = "No game loaded";
 const DEFAULT_TITLE: &str = "Chip-8 Emulator";
 const TITLE_PREFIX: &str = "chip8";
+
+const START_PC: u16 = 0x200;
 
 #[cfg(test)]
 mod tests;
@@ -30,7 +33,7 @@ pub struct Chip8 {
     #[serde(skip)]
     opcode: Opcode,
     #[serde_as(as = "[_; 4096]")]
-    memory: [u8; 4096], // [0x0, 0x200) are reserved for our own use.
+    memory: [u8; 4096], // [0x0, START_PC) are reserved for our own use.
     registers: [u8; 16],
     index_reg: u16,
     pc: u16,
@@ -311,7 +314,7 @@ impl InstructionSet for Chip8 {
         // starting in memory at the location in the index register.
         for (loc, reg) in (usize::from(self.index_reg)..).zip(0..=self.opcode.xreg) {
             if loc >= self.memory.len() {
-                panic!("Cannot save save register {reg} to memory location {loc}: out of bounds!");
+                panic!("Cannot save register {reg} to memory location {loc}: out of bounds!");
             }
 
             self.memory[loc] = self.registers[reg];
@@ -323,9 +326,7 @@ impl InstructionSet for Chip8 {
         // starting in memory at the location in the index register.
         for (loc, reg) in (usize::from(self.index_reg)..).zip(0..=self.opcode.xreg) {
             if loc >= self.memory.len() {
-                panic!(
-                    "Cannot save load register {reg} from memory location {loc}: out of bounds!"
-                );
+                panic!("Cannot load register {reg} from memory location {loc}: out of bounds!");
             }
 
             self.registers[reg] = self.memory[loc];
@@ -379,7 +380,7 @@ impl Default for Chip8 {
             memory: [0; 4096],
             registers: [0; 16], // We use wrapping arithmetic.
             index_reg: 0,
-            pc: 0x200, // Starting PC is static.
+            pc: START_PC,
             delay_timer: 0,
             sound_timer: 0,
             stack: [0; 16],
@@ -426,6 +427,11 @@ impl Default for Chip8 {
 }
 
 impl Chip8 {
+    fn set_debug(&mut self, debug: bool) {
+        self.hardware.debug = debug;
+        self.debug = debug;
+    }
+
     fn load_game(&mut self, file_path: &str) -> Result<(), Error> {
         self.hardware
             .set_title(&format!("{}: {}", TITLE_PREFIX, file_path))?; // Handles title errors.
@@ -433,13 +439,17 @@ impl Chip8 {
 
         let contents: Vec<u8> = fs::read(file_path)?; // Handles all read errors.
         for (index, value) in contents.iter().enumerate() {
-            self.memory[0x200 + index] = *value; // Essentially memcpy().
+            self.memory[usize::from(START_PC) + index] = *value; // Essentially memcpy().
         }
 
         Ok(())
     }
 
-    fn from_state(file_path: &str, save_state_path: Option<String>) -> Result<Chip8, Error> {
+    fn from_state(
+        file_path: &str,
+        debug: bool,
+        save_state_path: Option<String>,
+    ) -> Result<Chip8, Error> {
         let contents: Vec<u8> = fs::read(file_path)?; // Return errors inline.
         let parsed_c8: Result<Chip8, serde_json::Error> = serde_json::from_slice(&contents);
         match parsed_c8 {
@@ -447,28 +457,32 @@ impl Chip8 {
                 // Update state not settable from default().
                 c8.hardware
                     .set_title(&format!("{}: {}", TITLE_PREFIX, file_path))?; // Handles title errors.
-                                                                              // Update state overridden by the user.
+
+                // Update state overridden by the user.
                 c8.save_state_path = save_state_path;
-                println!("Loaded state is: {c8}");
+                c8.set_debug(debug); // Debug is not stored in the state, so this only enables it.
 
                 // Draw the screen once to start.
                 c8.hardware.update_display(&c8.screen);
                 Ok(c8)
             }
-            Err(error) => Err(Error::other(error)),
+            Err(error) => {
+                match error.classify() {
+                    Category::Io => Err(Error::other(error)),
+                    // We assume all Syntax/Data/Eof errors are due to malformed input.
+                    _ => Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "Load state path does not appear to point to a valid saved state!",
+                    )),
+                }
+            }
         }
     }
 
     fn to_state(&mut self, to_file_path: &str) -> Result<(), Error> {
         let mut save_file = fs::File::create(to_file_path)?;
         match serde_json::to_vec(self) {
-            Ok(serialized_c8) => {
-                println!("Serialized state is: {serialized_c8:?}");
-                println!("In-memory state is: {self}");
-                let res = save_file.write_all(&serialized_c8);
-                std::thread::sleep(std::time::Duration::from_nanos(1000000000));
-                return res;
-            }
+            Ok(serialized_c8) => save_file.write_all(&serialized_c8),
             Err(error) => Err(Error::other(error)),
         }
     }
@@ -481,8 +495,7 @@ impl Chip8 {
     ) -> Result<Chip8, Error> {
         if let Some(game) = game_path {
             // A provided path to a game file *always* overrides a load-state.
-            let screen = Screen::default();
-            let hardware = Hw::new(&screen, debug, DEFAULT_TITLE);
+            let hardware = Hw::new(&Screen::default(), debug, DEFAULT_TITLE);
             let mut c8 = Chip8 {
                 hardware,
                 debug,
@@ -493,7 +506,7 @@ impl Chip8 {
             c8.load_game(&game)?;
             Ok(c8)
         } else if let Some(state) = load_state_path {
-            Self::from_state(&state, save_state_path)
+            Self::from_state(&state, debug, save_state_path)
         } else {
             Err(Error::new(
                 ErrorKind::NotFound,
@@ -505,8 +518,7 @@ impl Chip8 {
     #[cfg(test)]
     pub fn tester(debug: bool) -> Chip8 {
         // Why not Hw::default()? Only really to pass debug.
-        let screen = Screen::default();
-        let hardware = Hw::new(&screen, debug, DEFAULT_TITLE);
+        let hardware = Hw::new(&Screen::default(), debug, DEFAULT_TITLE);
         Chip8 {
             hardware,
             debug,

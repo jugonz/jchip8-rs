@@ -4,7 +4,7 @@ use super::interactible::SetKeysResult;
 use super::screen::Screen;
 
 pub struct MockHardware {
-    debug: bool,
+    pub debug: bool,
     title: String,
     keyboard: [bool; 1], // True if a key is pressed.
 }

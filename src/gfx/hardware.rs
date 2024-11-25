@@ -31,7 +31,7 @@ const KEY_SAVE_STATE: Scancode = Scancode::S;
 const NO_GAME_LOADED: &str = "No game loaded";
 
 pub struct Hardware {
-    debug: bool,
+    pub debug: bool,
     title: String,
     sdl: sdl2::Sdl,
     canvas: sdl2::render::Canvas<sdl2::video::Window>,
@@ -263,7 +263,6 @@ impl Interactible for Hardware {
         self.canvas.set_draw_color(Color::WHITE);
 
         for (setx, sety) in screen {
-            // println!("Found pixel ({setx}, {sety}) set!");
             let xcoord = ((setx as u32) * screen.x_display_scale) as i32;
             let ycoord = ((sety as u32) * screen.y_display_scale) as i32;
 

@@ -39,7 +39,6 @@ impl Iterator for ScreenIterator<'_> {
                     // If we see a pixel past the last Y we saw in the first vector,
                     // or a pixel in *ANY* vector past the first, it's new. Save it and return it.
                     self.curr = (real_xindex, yindex);
-                    // println!("Setting curr to ({real_xindex}, {yindex})");
                     return Some(self.curr);
                 }
             }
