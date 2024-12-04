@@ -1,7 +1,10 @@
 [package]
 name = "chip8"
 version = "0.1.0"
+authors = ["Julian Gonzalez <jugonzalez12@gmail.com>"]
 edition = "2021"
+description = "A simple emulator for the Chip8 platform"
+license = "MIT"
 
 [dependencies]
 clap = { version = "4.5.19", features = ["derive"] }
