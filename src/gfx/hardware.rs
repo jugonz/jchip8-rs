@@ -1,12 +1,8 @@
 use super::{Drawable, Interactible, Screen, SetKeysResult};
-
 use std::io::Error;
+use sdl2::{event::Event, keyboard::Scancode, pixels::Color, rect::Rect};
 
-use sdl2::event::Event;
-use sdl2::keyboard::Scancode;
-use sdl2::pixels::Color;
-use sdl2::rect::Rect;
-
+// Keyboard layout constants.
 const KEYBOARD_LAYOUT: [Scancode; 16] = [
     Scancode::Num0,
     Scancode::Num1,
@@ -30,13 +26,23 @@ const KEY_PAUSE: Scancode = Scancode::P;
 const KEY_SAVE_STATE: Scancode = Scancode::S;
 const NO_GAME_LOADED: &str = "No game loaded";
 
+/// A struct describing the interactible aspects of an emulated device
+/// and the machinery required to operate them.
 pub struct Hardware {
+    // Whether or not debug mode is enabled (if so, verbose logging is emitted).
     pub debug: bool,
+    // The title of this device (which may be used in display-related components).
     title: String,
+    // SDL components.
     sdl: sdl2::Sdl,
     canvas: sdl2::render::Canvas<sdl2::video::Window>,
+    // The event pump is wrapped in an optional so that it does not
+    // need to be initialized at struct creation time.
+    // This is helpful for testing and also borrow-checking.
     events: Option<sdl2::EventPump>,
-    keyboard: [bool; KEYBOARD_LAYOUT.len()], // True if a key is pressed.
+    // An array of keyboard keys, true for each key if currently pressed
+    // (this remains true while the key is held down).
+    keyboard: [bool; KEYBOARD_LAYOUT.len()],
 }
 
 impl Hardware {
@@ -72,6 +78,7 @@ impl Hardware {
     }
 
     fn draw_rect(&mut self, rect: Rect) {
+        // Draw the Rect instance and terminate if SDL fails to do so.
         self.canvas
             .fill_rect(rect)
             .expect("Failed to draw rectangle!");
@@ -198,9 +205,12 @@ impl Hardware {
 
     fn draw_pause(&mut self, screen: &Screen) {
         // We want to draw a pause icon in the middle of the screen.
+
+        // First, clear the screen (draw it entirely black).
         self.canvas.set_draw_color(Color::BLACK);
         self.canvas.clear();
 
+        // Next, draw the left hand side bar of the pause icon in white.
         self.canvas.set_draw_color(Color::WHITE);
         let xcoord = (screen.res_width / 2) - (screen.res_width / 12); // Roughly lhs of middle of screen.
         let ycoord = screen.res_height / 3; // Roughly top of middle of screen.
@@ -216,6 +226,7 @@ impl Hardware {
             self.draw_rect(rect);
         }
 
+        // Now, draw the right hand side bar of the pause icon in white.
         let xcoord = (screen.res_width / 2) + (screen.res_width / 12); // Roughly rhs of middle of screen.
         if screen.in_bounds(xcoord, ycoord) {
             let rect = Rect::new(
@@ -233,10 +244,10 @@ impl Hardware {
 
 impl Interactible for Hardware {
     fn init(&mut self) {
-        // This is a singleton - so we cannot reference the event pump
-        // *inside* of self.sdl inside of the constructor, since it's
-        // being moved there - it needs to be referenced elsewhere,
-        // like here.
+        // Another reason we construct the event pump here:
+        // it is a singleton, so we cannot reference the event pump
+        // *inside* of self.sdl inside of the constructor.
+        // (It's being moved there.)
         self.events = Some(
             self.sdl
                 .event_pump()
@@ -245,6 +256,7 @@ impl Interactible for Hardware {
     }
 
     fn set_title(&mut self, title: &str) -> Result<(), Error> {
+        // Set the title of the device (and update it in display-related components).
         self.title = String::from(title);
 
         if let Err(err) = self.canvas.window_mut().set_title(&self.title) {
@@ -262,6 +274,9 @@ impl Interactible for Hardware {
         // Next, draw the set pixels with white.
         self.canvas.set_draw_color(Color::WHITE);
 
+        // Iterate over only the set pixels, and create an SDL Rect instance
+        // for each one, and draw it. (It will not visibly appear until
+        // the canvas itself is made visible).
         for (setx, sety) in screen {
             let xcoord = ((setx as u32) * screen.x_display_scale) as i32;
             let ycoord = ((sety as u32) * screen.y_display_scale) as i32;
@@ -275,6 +290,7 @@ impl Interactible for Hardware {
             self.draw_rect(rect);
         }
 
+        // Make the canvas visible.
         self.canvas.present();
     }
 
@@ -285,7 +301,9 @@ impl Interactible for Hardware {
             return SetKeysResult::ShouldExit;
         };
 
-        // Check for keyboard input.
+        // Check for keyboard input, and update our internal state
+        // for each key. (Because we do not have any perpetual listeners
+        // on the event pump, we must query each key's state individually.)
         let keyboard_state = event_pump.keyboard_state();
         for (index, key) in KEYBOARD_LAYOUT.iter().enumerate() {
             if keyboard_state.is_scancode_pressed(*key) {
@@ -298,7 +316,7 @@ impl Interactible for Hardware {
             }
         }
 
-        // Now that keys have been processed,
+        // Now that regular keys have been processed,
         // check what action we will return to our caller.
         //
         // There are three actions:
@@ -352,6 +370,7 @@ impl Interactible for Hardware {
     }
 
     fn get_keys(&self) -> &[bool] {
+        // This allows callers to easily iterate the current set of keys pressed.
         &self.keyboard
     }
 

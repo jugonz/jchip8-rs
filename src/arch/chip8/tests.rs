@@ -59,8 +59,6 @@ fn clear_screen() {
     // some pixels were set.
     run_opcode(&mut c8, 0xD324);
     let pixels_count = c8.screen.into_iter().count();
-
-    // If all pixels are false, clear is true.
     assert_ne!(pixels_count, 0, "DrawSprite failed to draw the screen!");
 
     // Now, clear the screen, and check that it is empty.

@@ -1,19 +1,19 @@
-#![allow(dead_code)]
-use super::interactible::Interactible;
-use super::interactible::SetKeysResult;
+use super::interactible::{Interactible, SetKeysResult};
 use super::screen::Screen;
 
+#[derive(Default)]
+/// A placeholder struct for Hardware that is useful during testing
+/// when we cannot call any SDL methods (since our test runner
+/// may not run our tests on the main thread, which SDL strictly requires).
 pub struct MockHardware {
     pub debug: bool,
-    title: String,
-    keyboard: [bool; 1], // True if a key is pressed.
+    keyboard: [bool; 1],
 }
 
 impl MockHardware {
-    pub fn new(_screen: &Screen, debug: bool, title: &str) -> MockHardware {
+    pub fn new(_screen: &Screen, debug: bool, _title: &str) -> MockHardware {
         MockHardware {
             debug,
-            title: String::from(title),
             keyboard: [false; 1],
         }
     }
@@ -22,8 +22,7 @@ impl MockHardware {
 impl Interactible for MockHardware {
     fn init(&mut self) {}
 
-    fn set_title(&mut self, title: &str) -> Result<(), std::io::Error> {
-        self.title = String::from(title);
+    fn set_title(&mut self, _title: &str) -> Result<(), std::io::Error> {
         Ok(())
     }
 
@@ -39,12 +38,5 @@ impl Interactible for MockHardware {
 
     fn key_is_pressed(&self, _key: u8) -> bool {
         false
-    }
-}
-
-impl Default for MockHardware {
-    fn default() -> MockHardware {
-        let screen = Screen::default();
-        MockHardware::new(&screen, false, "")
     }
 }

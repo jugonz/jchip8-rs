@@ -1,3 +1,4 @@
+/// A trait that describes the operations of the CPU of an emulated device.
 pub trait InstructionSet {
     // Graphics controls.
     fn clear_screen(&mut self);
@@ -19,13 +20,14 @@ pub trait InstructionSet {
     // Manipulating data registers.
     fn set_reg_to_literal(&mut self);
     fn set_reg_to_reg(&mut self);
-
     fn add(&mut self);
     fn add_with_carry(&mut self);
     fn or(&mut self);
     fn and(&mut self);
     fn xor(&mut self);
+    // Subtract the lower register from the higher register.
     fn sub_x_from_y(&mut self);
+    // Subtract the higher register from the lower register.
     fn sub_y_from_x(&mut self);
     fn shift_right(&mut self);
     fn shift_left(&mut self);

@@ -5,22 +5,26 @@ use crate::gfx::Hardware;
 use crate::gfx::MockHardware;
 use crate::gfx::{Drawable, Interactible, Screen, SetKeysResult};
 
+use std::io::{Error, ErrorKind, Write};
+use std::{fmt, fs, thread, time};
+
 use serde::{Deserialize, Serialize};
 use serde_json::error::Category;
 use serde_with::serde_as;
 
-use std::io::{Error, ErrorKind, Write};
-use std::{fmt, fs, thread, time};
-
+// Emulator constants.
 const NO_GAME_LOADED: &str = "No game loaded";
 const DEFAULT_TITLE: &str = "Chip-8 Emulator";
 const TITLE_PREFIX: &str = "chip8";
-
 const START_PC: u16 = 0x200;
+const CYCLE_RATE: u64 = 1666667; // ~60hz
 
 #[cfg(test)]
 mod tests;
 
+// A simple abstraction of our Hardware types
+// to avoid calling SDL methods during testing
+// (see `MockHardware` for more info).
 #[cfg(test)]
 type Hw = MockHardware;
 #[cfg(not(test))]
@@ -33,29 +37,45 @@ pub struct Chip8 {
     #[serde(skip)]
     opcode: Opcode,
     #[serde_as(as = "[_; 4096]")]
-    memory: [u8; 4096], // [0x0, START_PC) are reserved for our own use.
+    // Core memory.
+    // [0x0, START_PC) are reserved for our own use.
+    memory: [u8; 4096],
     registers: [u8; 16],
     index_reg: u16,
     pc: u16,
+    // A timer for emulated programs to use,
+    // decremented once per cycle.
     delay_timer: u8,
+    // A sound timer for emulated programs to use,
+    // also decremented once per cycle.
+    // We are responsible for emitting a sound when it hits zero.
     sound_timer: u8,
     stack: [u16; 16],
     sp: u8,
-    update_pc_cycles: u16, // Amount of cycles to update PC.
-    cycle_rate: u64,       // How fast to run one cycle in nanoseconds.
+    // The amount of cycles to update the PC at the end of this cycle.
+    update_pc_cycles: u16,
+    // How fast to run one cycle in nanoseconds.
+    cycle_rate: u64,
 
     // Interactive components.
     screen: Screen,
     #[serde(skip)]
-    hardware: Hw, // Interactible.
-    #[serde_as(as = "[_; 80]")] // We could skip serializing this but there is no default.
-    fontset: [u8; 80], // Essentially hardcoded fonts to draw with.
+    // The Interactible portion of the emulator.
+    hardware: Hw,
+    #[serde_as(as = "[_; 80]")]
+    // Essentially hardcoded fonts to draw with.
+    // We could skip serializing this, but it would require a
+    // Default implementation for a fixed-size array of 80 u8's,
+    // so we just allow it to be serialized.
+    fontset: [u8; 80],
     draw_flag: bool,
 
     #[serde(skip)]
+    // The game title (for use in the displayed window's title).
     game_title: String,
 
     #[serde(skip)]
+    // Path to save a game state to (or overwrite), if any.
     save_state_path: Option<String>,
 
     // Debug components.
@@ -64,6 +84,7 @@ pub struct Chip8 {
     count: u64,
 }
 
+// The implementation of hardware instructions for the Chip8 platform.
 impl InstructionSet for Chip8 {
     fn clear_screen(&mut self) {
         self.screen.clear_all_pixels();
@@ -119,7 +140,7 @@ impl InstructionSet for Chip8 {
         self.sp += 1; // Allow overflow to panic - the stack is only 16 entries anyway.
 
         self.pc = self.opcode.literal;
-        self.update_pc_cycles = 0; // since we just changed PC manually
+        self.update_pc_cycles = 0; // Since we just changed PC manually.
     }
 
     fn r#return(&mut self) {
@@ -226,7 +247,7 @@ impl InstructionSet for Chip8 {
             self.registers[self.opcode.yreg].overflowing_sub(self.registers[self.opcode.xreg]);
 
         self.registers[self.opcode.xreg] = diff;
-        self.registers[0xF] = !underflowed as u8; // inverted, save 0 on underflow
+        self.registers[0xF] = !underflowed as u8; // Inverted, save 0 on underflow.
     }
 
     fn sub_y_from_x(&mut self) {
@@ -234,7 +255,7 @@ impl InstructionSet for Chip8 {
             self.registers[self.opcode.xreg].overflowing_sub(self.registers[self.opcode.yreg]);
 
         self.registers[self.opcode.xreg] = diff;
-        self.registers[0xF] = !underflowed as u8; // inverted, save 0 on underflow
+        self.registers[0xF] = !underflowed as u8; // Inverted, save 0 on underflow.
     }
 
     fn shift_right(&mut self) {
@@ -254,7 +275,7 @@ impl InstructionSet for Chip8 {
     }
 
     fn set_reg_random_mask(&mut self) {
-        let mask = self.opcode.value as u8; // "as u8" chops to 0xFF for us
+        let mask = self.opcode.value as u8; // "as u8" chops to 0xFF for us.
         let random_number = rand::random::<u8>();
 
         self.registers[self.opcode.xreg] = mask & random_number;
@@ -345,6 +366,7 @@ impl InstructionSet for Chip8 {
     }
 }
 
+// Mostly useful for debugging.
 impl fmt::Display for Chip8 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -370,6 +392,13 @@ impl fmt::Display for Chip8 {
     }
 }
 
+// The default values for Chip8's members.
+// We choose to define them here instead of inside an initialization function
+// so that serde / serde_json can populate them as well when reading
+// a state from disk (which does not store all of these members).
+//
+// Note that the default Hw instance / debug / opcode / save_state_path members
+// are placeholders and must be overridden when using this default.
 impl Default for Chip8 {
     fn default() -> Chip8 {
         let screen = Screen::default();
@@ -408,7 +437,7 @@ impl Default for Chip8 {
                 0xF0, 0x80, 0xF0, 0x80, 0x80, // F
             ],
             draw_flag: false,
-            cycle_rate: 1666667, // ~60hz
+            cycle_rate: CYCLE_RATE,
 
             game_title: String::from(NO_GAME_LOADED),
             save_state_path: None,
@@ -428,15 +457,21 @@ impl Default for Chip8 {
 
 impl Chip8 {
     fn set_debug(&mut self, debug: bool) {
+        // Override the debug value with a new one (useful when loading a state).
         self.hardware.debug = debug;
         self.debug = debug;
     }
 
     fn load_game(&mut self, file_path: &str) -> Result<(), Error> {
+        // Load a game file from disk (without a saved state,
+        // but with an already-initialized Chip8 instance).
+
+        // Set the game's title.
         self.hardware
             .set_title(&format!("{}: {}", TITLE_PREFIX, file_path))?; // Handles title errors.
         self.game_title = String::from(file_path);
 
+        // Load the game into memory.
         let contents: Vec<u8> = fs::read(file_path)?; // Handles all read errors.
         for (index, value) in contents.iter().enumerate() {
             self.memory[usize::from(START_PC) + index] = *value; // Essentially memcpy().
@@ -450,6 +485,10 @@ impl Chip8 {
         debug: bool,
         save_state_path: Option<String>,
     ) -> Result<Chip8, Error> {
+        // Load a game's state from disk (this includes the game data itself).
+        // Here we do not have an existing Chip8 instance and must create one with serde and friends.
+
+        // Read the game state and deserialize it into a Chip8 instance.
         let contents: Vec<u8> = fs::read(file_path)?; // Return errors inline.
         let parsed_c8: Result<Chip8, serde_json::Error> = serde_json::from_slice(&contents);
         match parsed_c8 {
@@ -467,7 +506,10 @@ impl Chip8 {
                 Ok(c8)
             }
             Err(error) => {
+                // Serde was not able to deserialize the state into a valid Chip8 instance.
                 match error.classify() {
+                    // We allow I/O errors to pass through because they may indicate a problem
+                    // on the host system (i.e. the path to the saved state is not present).
                     Category::Io => Err(Error::other(error)),
                     // We assume all Syntax/Data/Eof errors are due to malformed input.
                     _ => Err(Error::new(
@@ -480,6 +522,8 @@ impl Chip8 {
     }
 
     fn to_state(&mut self, to_file_path: &str) -> Result<(), Error> {
+        // Save a Chip8 instance to disk (where it can be loaded again later).
+
         let mut save_file = fs::File::create(to_file_path)?;
         match serde_json::to_vec(self) {
             Ok(serialized_c8) => save_file.write_all(&serialized_c8),
@@ -493,8 +537,13 @@ impl Chip8 {
         load_state_path: Option<String>,
         save_state_path: Option<String>,
     ) -> Result<Chip8, Error> {
+        // Create a Chip8 instance, given one of {path to game, save state to load}.
+        // Optionally, provide a path to save game states to (which may be the same
+        // as the path to the save state to load, in case the user wants to overwrite it).
+
         if let Some(game) = game_path {
-            // A provided path to a game file *always* overrides a load-state.
+            // Start a game from scratch.
+            // (A provided path to a game file *always* overrides a load-state.)
             let hardware = Hw::new(&Screen::default(), debug, DEFAULT_TITLE);
             let mut c8 = Chip8 {
                 hardware,
@@ -506,6 +555,7 @@ impl Chip8 {
             c8.load_game(&game)?;
             Ok(c8)
         } else if let Some(state) = load_state_path {
+            // Load an existing game's state.
             Self::from_state(&state, debug, save_state_path)
         } else {
             Err(Error::new(
@@ -517,7 +567,8 @@ impl Chip8 {
 
     #[cfg(test)]
     pub fn tester(debug: bool) -> Chip8 {
-        // Why not Hw::default()? Only really to pass debug.
+        // Create a Chip8 instance for unit testing.
+        // Why not use Hw::default() here? Really only to pass debug.
         let hardware = Hw::new(&Screen::default(), debug, DEFAULT_TITLE);
         Chip8 {
             hardware,
@@ -539,7 +590,9 @@ impl Chip8 {
     }
 
     fn decode_execute(&mut self) {
-        self.update_pc_cycles = 2; // unless overridden
+        // Decode and execute the current Opcode value.
+
+        self.update_pc_cycles = 2; // Unless overridden.
         let value = self.opcode.value;
         let lower_value = value as u8;
 
@@ -609,6 +662,7 @@ impl Chip8 {
     }
 
     fn draw_screen(&mut self) {
+        // Draw the screen, if required.
         if self.draw_flag {
             self.hardware.update_display(&self.screen);
             self.draw_flag = false;
@@ -616,6 +670,9 @@ impl Chip8 {
     }
 
     fn update_timers(&mut self) {
+        // Update delay and sound timers,
+        // and beep if the sound timer has reached zero.
+
         if self.delay_timer > 0 {
             self.delay_timer -= 1;
         }
@@ -627,12 +684,14 @@ impl Chip8 {
     }
 
     fn increment_pc(&mut self) {
+        // Increment the PC the correct amount of cycles.
         self.pc += self.update_pc_cycles;
     }
 
     fn emulate_cycle(&mut self) -> bool {
-        // Returns false if we decided to stop.
         // Emulate one cycle of our operation.
+        // Returns false if we decided to stop.
+
         self.fetch_opcode();
         if self.debug {
             println!("On cycle {}, at memory location {}", self.count, self.pc);
@@ -660,15 +719,19 @@ impl Chip8 {
 
 impl Emulator for Chip8 {
     fn run(&mut self) {
+        // Run the emulated device, returning only when the game or user quits.
+
         self.fetch_opcode();
         if self.opcode == Opcode::default() {
             // No game is loaded, so just exit.
+            // (This is mostly useful when a 'game' has been loaded that does not
+            // contain valid Chip8 instructions.)
             return;
         }
-
         self.hardware.init();
 
         while self.emulate_cycle() {
+            // Emulate a cycle, and then wait the proper amount to match the cycle rate.
             thread::sleep(time::Duration::from_nanos(self.cycle_rate));
         }
     }
