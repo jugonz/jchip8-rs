@@ -1,6 +1,6 @@
 use super::{Drawable, Interactible, Screen, SetKeysResult};
-use std::io::Error;
 use sdl2::{event::Event, keyboard::Scancode, pixels::Color, rect::Rect};
+use std::io::Error;
 
 // Keyboard layout constants.
 const KEYBOARD_LAYOUT: [Scancode; 16] = [

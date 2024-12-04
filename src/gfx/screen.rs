@@ -1,7 +1,7 @@
 use super::Drawable;
-use std::fmt;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+use std::fmt;
 
 #[serde_as]
 #[derive(Serialize, Deserialize)]
