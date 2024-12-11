@@ -5,6 +5,9 @@ authors = ["Julian Gonzalez <jugonzalez12@gmail.com>"]
 edition = "2021"
 description = "A simple emulator for the Chip8 platform"
 license = "MIT"
+keywords = ["emulator", "chip8"]
+readme = "README.md"
+repository = "https://github.com/jugonz/jchip8-rs"
 
 [dependencies]
 clap = { version = "4.5.19", features = ["derive"] }
