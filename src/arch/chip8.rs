@@ -560,7 +560,7 @@ impl Chip8 {
         } else {
             Err(Error::new(
                 ErrorKind::NotFound,
-                "Neither a game nor a load state path was specified.",
+                "Neither a game nor a load state path was specified. Please check usage with '-h'.",
             ))
         }
     }
